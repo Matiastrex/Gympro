@@ -43,10 +43,13 @@ export function update(id: number, data: Prisma.OportunidadUpdateInput) {
 }
 
 // Agrupa las oportunidades por etapa para el tablero del embudo comercial.
+// Ojo: se agrupan TODAS las oportunidades (no solo las ABIERTA), porque el
+// propio etapaId ya indica en qué columna va. Si acá filtráramos por estado
+// ABIERTA, las oportunidades recién cerradas (Inscripto/Perdida) desaparecerían
+// del tablero entero en vez de mostrarse en su columna de cierre.
 export async function findAgrupadasPorEtapa() {
   const etapas = await prisma.etapa.findMany({ orderBy: { orden: "asc" } });
   const oportunidades = await prisma.oportunidad.findMany({
-    where: { estado: "ABIERTA" },
     include: includeCompleto,
   });
 
