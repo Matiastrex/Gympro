@@ -1,0 +1,21 @@
+# Dependencias (cada uno las instala con npm install)
+node_modules/
+
+# Variables de entorno con datos sensibles (contraseñas, secrets) — NUNCA se sube
+backend/.env
+frontend/.env
+
+# Build/compilación
+backend/dist/
+frontend/dist/
+*.tsbuildinfo
+
+# Sistema operativo / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Importante: backend/prisma/migrations/ NO se ignora — esas carpetas hay
+# que subirlas al repo, son las que le permiten a tus compañeros crear las
+# mismas tablas en su propio MySQL con `prisma migrate dev`.

@@ -1,0 +1,228 @@
+// Esquema de datos de GymPro CRM.
+// Diseñado para cubrir la Entrega Final desde el día 1: la Primera Entrega
+// (MVP) solo expone por API/UI un subconjunto de estas tablas, pero el
+// modelo ya está completo para no tener que migrar/rehacer datos después.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------- Enums ----------
+
+enum Rol {
+  ADMINISTRADOR
+  VENDEDOR
+  RESPONSABLE_COMERCIAL
+}
+
+enum EstadoEntidad {
+  POTENCIAL
+  CLIENTE
+  INACTIVO
+  NO_CONTACTAR
+}
+
+enum TipoEtapa {
+  ABIERTA
+  GANADA
+  PERDIDA
+}
+
+enum EstadoOportunidad {
+  ABIERTA
+  GANADA
+  PERDIDA
+}
+
+// ---------- Usuarios (roles completos ya modelados; el MVP usa 1 solo rol) ----------
+
+model Usuario {
+  id           Int      @id @default(autoincrement())
+  nombre       String
+  apellido     String
+  email        String   @unique
+  passwordHash String
+  rol          Rol      @default(VENDEDOR)
+  activo       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  empresasResponsable   Empresa[]        @relation("ResponsableEmpresa")
+  contactosResponsable  Contacto[]       @relation("ResponsableContacto")
+  oportunidades         Oportunidad[]    @relation("ResponsableOportunidad")
+  actividades           Actividad[]
+  cambiosDeEtapa        HistorialEtapa[]
+
+  @@map("usuarios")
+}
+
+// ---------- Módulo 1: empresas y contactos ----------
+
+model Empresa {
+  id            Int           @id @default(autoincrement())
+  razonSocial   String
+  cuit          String?
+  industria     String?
+  email         String?
+  telefono      String?
+  direccion     String?
+  sitioWeb      String?
+  estado        EstadoEntidad @default(POTENCIAL)
+  origen        String?
+  observaciones String?       @db.Text
+
+  responsableId Int?
+  responsable   Usuario? @relation("ResponsableEmpresa", fields: [responsableId], references: [id])
+
+  contactos     Contacto[]
+  oportunidades Oportunidad[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("empresas")
+}
+
+model Contacto {
+  id            Int           @id @default(autoincrement())
+  nombre        String
+  apellido      String
+  documento     String?
+  cargo         String?
+  email         String?
+  telefono      String?
+  estado        EstadoEntidad @default(POTENCIAL)
+  origen        String?
+  observaciones String?       @db.Text
+
+  empresaId Int?
+  empresa   Empresa? @relation(fields: [empresaId], references: [id])
+
+  responsableId Int?
+  responsable   Usuario? @relation("ResponsableContacto", fields: [responsableId], references: [id])
+
+  oportunidades Oportunidad[]
+  actividades   Actividad[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("contactos")
+}
+
+// ---------- Productos / servicios: planes de membresía del gimnasio ----------
+// (No confundir con los planes SaaS "Básico/Profesional" de GymPro: estos son
+// los productos que EL GIMNASIO le vende a sus socios).
+
+model Producto {
+  id          Int      @id @default(autoincrement())
+  nombre      String
+  descripcion String?  @db.Text
+  precio      Decimal? @db.Decimal(10, 2)
+  activo      Boolean  @default(true)
+
+  oportunidades Oportunidad[]
+
+  @@map("productos")
+}
+
+// ---------- Embudo comercial: etapas ----------
+// Etapas precargadas para el MVP (seed). La configuración de etapas desde la
+// UI queda para la Entrega Final (Módulo de administración).
+
+model Etapa {
+  id     Int       @id @default(autoincrement())
+  nombre String
+  orden  Int
+  tipo   TipoEtapa @default(ABIERTA)
+
+  oportunidades   Oportunidad[]
+  historialComoNueva HistorialEtapa[] @relation("EtapaNueva")
+
+  @@map("etapas")
+}
+
+// ---------- Módulo 2: oportunidades ----------
+
+model Oportunidad {
+  id     Int    @id @default(autoincrement())
+  titulo String
+
+  empresaId Int?
+  empresa   Empresa? @relation(fields: [empresaId], references: [id])
+
+  contactoId Int?
+  contacto   Contacto? @relation(fields: [contactoId], references: [id])
+
+  responsableId Int?
+  responsable   Usuario? @relation("ResponsableOportunidad", fields: [responsableId], references: [id])
+
+  productoId Int?
+  producto   Producto? @relation(fields: [productoId], references: [id])
+
+  etapaId Int
+  etapa   Etapa @relation(fields: [etapaId], references: [id])
+
+  valorEstimado       Decimal?           @db.Decimal(10, 2)
+  probabilidadCierre  Int?
+  fechaEstimadaCierre DateTime?
+  fechaRealCierre     DateTime?
+  origen              String?
+  estado              EstadoOportunidad  @default(ABIERTA)
+  motivoPerdida       String?
+  observaciones       String?            @db.Text
+
+  actividades     Actividad[]
+  historialEtapas HistorialEtapa[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("oportunidades")
+}
+
+// ---------- Módulo 3: actividades e historial (modelado ya; UI en Entrega Final) ----------
+
+model Actividad {
+  id     Int      @id @default(autoincrement())
+  tipo   String
+  fecha  DateTime @default(now())
+
+  usuarioId Int
+  usuario   Usuario @relation(fields: [usuarioId], references: [id])
+
+  contactoId Int?
+  contacto   Contacto? @relation(fields: [contactoId], references: [id])
+
+  oportunidadId Int?
+  oportunidad   Oportunidad? @relation(fields: [oportunidadId], references: [id])
+
+  descripcion String? @db.Text
+  resultado   String?
+
+  @@map("actividades")
+}
+
+model HistorialEtapa {
+  id Int @id @default(autoincrement())
+
+  oportunidadId Int
+  oportunidad   Oportunidad @relation(fields: [oportunidadId], references: [id])
+
+  etapaAnteriorId Int?
+  etapaNuevaId    Int
+  etapaNueva      Etapa @relation("EtapaNueva", fields: [etapaNuevaId], references: [id])
+
+  usuarioId Int
+  usuario   Usuario @relation(fields: [usuarioId], references: [id])
+
+  fecha       DateTime @default(now())
+  observacion String?
+
+  @@map("historial_etapas")
+}
