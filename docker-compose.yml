@@ -1,0 +1,15 @@
+services:
+  mysql:
+    image: mysql:8
+    container_name: gympro-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: gympro
+      MYSQL_DATABASE: gympro_crm
+    ports:
+      - "3306:3306"
+    volumes:
+      - gympro_mysql_data:/var/lib/mysql
+
+volumes:
+  gympro_mysql_data:

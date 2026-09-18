@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { authRouter } from "../modules/auth/auth.routes";
+import { usuariosRouter } from "../modules/usuarios/usuarios.routes";
 import { empresasRouter } from "../modules/empresas/empresas.routes";
 import { contactosRouter } from "../modules/contactos/contactos.routes";
 import { productosRouter } from "../modules/productos/productos.routes";
@@ -10,6 +11,7 @@ import { embudoRouter } from "../modules/embudo/embudo.routes";
 export const apiRouter = Router();
 
 apiRouter.use("/auth", authRouter);
+apiRouter.use("/usuarios", usuariosRouter);
 apiRouter.use("/empresas", empresasRouter);
 apiRouter.use("/contactos", contactosRouter);
 apiRouter.use("/productos", productosRouter);

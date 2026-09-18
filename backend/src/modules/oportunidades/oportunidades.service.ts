@@ -74,7 +74,7 @@ export async function cambiarEtapa(params: {
 
   // Si la nueva etapa es de cierre (Ganada/Perdida), derivamos el estado y
   // la fecha real de cierre automáticamente, tal como exige la consigna.
-  const camposDerivados: Prisma.OportunidadUpdateInput = {};
+  const camposDerivados: Prisma.OportunidadUncheckedUpdateInput = {};
   if (etapaNueva.tipo === "GANADA") {
     camposDerivados.estado = "GANADA";
     camposDerivados.fechaRealCierre = new Date();

@@ -67,7 +67,7 @@ export function cambiarEtapa(params: {
   etapaNuevaId: number;
   usuarioId: number;
   observacion?: string;
-  camposDerivados?: Prisma.OportunidadUpdateInput;
+  camposDerivados?: Prisma.OportunidadUncheckedUpdateInput;
 }) {
   const { oportunidadId, etapaAnteriorId, etapaNuevaId, usuarioId, observacion, camposDerivados } = params;
 

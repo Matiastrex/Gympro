@@ -1,6 +1,7 @@
 import { Routes, Route } from "react-router-dom";
 import { ProtectedRoute } from "./routes/ProtectedRoute";
-import { Navbar } from "./components/Navbar";
+import { Sidebar } from "./components/Sidebar";
+import { Topbar } from "./components/Topbar";
 import { LoginPage } from "./pages/LoginPage";
 import { EmbudoPage } from "./pages/EmbudoPage";
 import { OportunidadesPage } from "./pages/OportunidadesPage";
@@ -9,9 +10,12 @@ import { EmpresasPage } from "./pages/EmpresasPage";
 
 function AppLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="layout">
-      <Navbar />
-      {children}
+    <div className="app-shell">
+      <Sidebar />
+      <div className="app-main">
+        <Topbar />
+        <main className="app-content">{children}</main>
+      </div>
     </div>
   );
 }

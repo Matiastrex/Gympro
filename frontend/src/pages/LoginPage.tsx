@@ -26,21 +26,70 @@ export function LoginPage() {
 
   return (
     <div className="login-wrapper">
-      <form className="card login-card" onSubmit={handleSubmit}>
-        <h2 style={{ marginTop: 0 }}>GymPro CRM</h2>
-        {error && <div className="error-box">{error}</div>}
-        <label style={{ display: "flex", flexDirection: "column", gap: 4, marginBottom: 10 }}>
-          Email
-          <input value={email} onChange={(e) => setEmail(e.target.value)} type="email" required />
-        </label>
-        <label style={{ display: "flex", flexDirection: "column", gap: 4, marginBottom: 16 }}>
-          Contraseña
-          <input value={password} onChange={(e) => setPassword(e.target.value)} type="password" required />
-        </label>
-        <button className="btn" type="submit" disabled={loading} style={{ width: "100%" }}>
-          {loading ? "Ingresando..." : "Ingresar"}
-        </button>
-      </form>
+      <div className="login-shell">
+        <form className="login-form-panel" onSubmit={handleSubmit}>
+          <div className="login-brand">
+            <div className="sidebar-logo">GP</div>
+            <span>GymPro CRM</span>
+          </div>
+
+          <div className="login-heading">
+            <h1>
+              Bienvenido de nuevo.
+              <br />
+              Iniciá sesión para continuar.
+            </h1>
+            <p>Ingresá tus datos para acceder al panel de gestión</p>
+          </div>
+
+          {error && <div className="error-box">{error}</div>}
+
+          <label className="login-field">
+            <span>Email</span>
+            <input
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              type="email"
+              required
+              autoFocus
+              placeholder="tu@gimnasio.com"
+            />
+          </label>
+          <label className="login-field">
+            <span>Contraseña</span>
+            <input
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              type="password"
+              required
+              placeholder="••••••••"
+            />
+          </label>
+
+          <button className="btn login-submit" type="submit" disabled={loading}>
+            {loading ? "Ingresando..." : "Ingresar"}
+          </button>
+
+          <p className="login-hint">Gestión comercial para gimnasios de barrio</p>
+        </form>
+
+        <div className="login-art-panel">
+          <div className="login-art-glow" />
+          <div className="login-art-card">
+            <div className="login-art-card-row">
+              <span className="login-art-avatar" />
+              <span className="login-art-bars">
+                <span />
+                <span />
+              </span>
+            </div>
+            <span className="login-art-bar-line" />
+            <span className="login-art-bar-line short" />
+            <span className="login-art-bar-line" />
+          </div>
+          <p className="login-art-tagline">Todo tu gimnasio, en un solo lugar.</p>
+        </div>
+      </div>
     </div>
   );
 }
