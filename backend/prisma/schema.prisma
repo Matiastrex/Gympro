@@ -93,6 +93,7 @@ model Contacto {
   id            Int           @id @default(autoincrement())
   nombre        String
   apellido      String
+  oportunidadAbiertaId Int?
   documento     String?
   cargo         String?
   email         String?

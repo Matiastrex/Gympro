@@ -111,6 +111,7 @@ export async function cambiarEtapa(params: {
   }
 
   const empresaIdToClear = etapaNueva.tipo !== "ABIERTA" ? oportunidad.empresaId : null;
+  const contactoIdToClear = etapaNueva.tipo !== "ABIERTA" ? oportunidad.contactoId : null;
 
   return oportunidadesRepo.cambiarEtapa({
     oportunidadId: params.oportunidadId,
@@ -121,5 +122,6 @@ export async function cambiarEtapa(params: {
     camposDerivados,
     camposActualizacion: params.camposActualizacion,
     empresaIdToClear,
+    contactoIdToClear,
   });
 }

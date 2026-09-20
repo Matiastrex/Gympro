@@ -38,10 +38,18 @@ export function create(data: Prisma.OportunidadCreateInput) {
   return prisma.$transaction(async (tx) => {
     const oportunidad = await tx.oportunidad.create({ data, include: includeCompleto });
     const empresaId = (data as unknown as Prisma.OportunidadUncheckedCreateInput).empresaId;
+    const contactoId = (data as unknown as Prisma.OportunidadUncheckedCreateInput).contactoId;
 
     if (empresaId != null) {
       await tx.empresa.update({
         where: { id: empresaId },
+        data: { oportunidadAbiertaId: oportunidad.id },
+      });
+    }
+
+    if (contactoId != null) {
+      await tx.contacto.update({
+        where: { id: contactoId },
         data: { oportunidadAbiertaId: oportunidad.id },
       });
     }
@@ -86,6 +94,7 @@ export function cambiarEtapa(params: {
   camposDerivados?: Prisma.OportunidadUncheckedUpdateInput;
   camposActualizacion?: Prisma.OportunidadUncheckedUpdateInput;
   empresaIdToClear?: number | null;
+  contactoIdToClear?: number | null;
 }) {
   const {
     oportunidadId,
@@ -96,6 +105,7 @@ export function cambiarEtapa(params: {
     camposDerivados,
     camposActualizacion,
     empresaIdToClear,
+    contactoIdToClear,
   } = params;
 
   return prisma.$transaction(async (tx) => {
@@ -108,6 +118,13 @@ export function cambiarEtapa(params: {
     if (empresaIdToClear != null) {
       await tx.empresa.update({
         where: { id: empresaIdToClear },
+        data: { oportunidadAbiertaId: null },
+      });
+    }
+
+    if (contactoIdToClear != null) {
+      await tx.contacto.update({
+        where: { id: contactoIdToClear },
         data: { oportunidadAbiertaId: null },
       });
     }
