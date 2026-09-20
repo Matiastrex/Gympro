@@ -66,6 +66,7 @@ model Usuario {
 model Empresa {
   id            Int           @id @default(autoincrement())
   razonSocial   String
+  oportunidadAbiertaId Int?
   cuit          String?
   industria     String?
   email         String?

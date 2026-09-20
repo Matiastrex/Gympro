@@ -35,11 +35,46 @@ export function findById(id: number) {
 }
 
 export function create(data: Prisma.OportunidadCreateInput) {
-  return prisma.oportunidad.create({ data, include: includeCompleto });
+  return prisma.$transaction(async (tx) => {
+    const oportunidad = await tx.oportunidad.create({ data, include: includeCompleto });
+    const empresaId = (data as unknown as Prisma.OportunidadUncheckedCreateInput).empresaId;
+
+    if (empresaId != null) {
+      await tx.empresa.update({
+        where: { id: empresaId },
+        data: { oportunidadAbiertaId: oportunidad.id },
+      });
+    }
+
+    return oportunidad;
+  });
 }
 
-export function update(id: number, data: Prisma.OportunidadUpdateInput) {
-  return prisma.oportunidad.update({ where: { id }, data, include: includeCompleto });
+export function findEtapaTipo(id: number) {
+  return prisma.etapa.findUnique({ where: { id }, select: { tipo: true } });
+}
+
+export function update(
+  id: number,
+  data: Prisma.OportunidadUpdateInput,
+  empresaIdToClear?: number | null
+) {
+  return prisma.$transaction(async (tx) => {
+    const oportunidad = await tx.oportunidad.update({
+      where: { id },
+      data,
+      include: includeCompleto,
+    });
+
+    if (empresaIdToClear != null) {
+      await tx.empresa.update({
+        where: { id: empresaIdToClear },
+        data: { oportunidadAbiertaId: null },
+      });
+    }
+
+    return oportunidad;
+  });
 }
 
 // Agrupa las oportunidades por etapa para el tablero del embudo comercial.

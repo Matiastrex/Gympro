@@ -44,9 +44,15 @@ export function crear(data: OportunidadInput) {
 }
 
 export async function actualizar(id: number, data: OportunidadInput) {
-  await obtener(id);
+  const oportunidad = await obtener(id);
   validarRelacionComercial(data);
-  return oportunidadesRepo.update(id, data as any);
+
+  const etapa = await oportunidadesRepo.findEtapaTipo(data.etapaId);
+  if (!etapa) throw ApiError.notFound("Etapa no encontrada");
+
+  // Si la oportunidad corresponde a una empresa y se está cerrando, limpiar Empresa.oportunidadAbiertaId.
+  const empresaIdToClear = etapa.tipo !== "ABIERTA" ? oportunidad.empresaId : null;
+  return oportunidadesRepo.update(id, data as any, empresaIdToClear);
 }
 
 export function tableroEmbudo() {
