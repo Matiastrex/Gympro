@@ -54,27 +54,8 @@ export function findEtapaTipo(id: number) {
   return prisma.etapa.findUnique({ where: { id }, select: { tipo: true } });
 }
 
-export function update(
-  id: number,
-  data: Prisma.OportunidadUpdateInput,
-  empresaIdToClear?: number | null
-) {
-  return prisma.$transaction(async (tx) => {
-    const oportunidad = await tx.oportunidad.update({
-      where: { id },
-      data,
-      include: includeCompleto,
-    });
-
-    if (empresaIdToClear != null) {
-      await tx.empresa.update({
-        where: { id: empresaIdToClear },
-        data: { oportunidadAbiertaId: null },
-      });
-    }
-
-    return oportunidad;
-  });
+export function update(id: number, data: Prisma.OportunidadUpdateInput) {
+  return prisma.oportunidad.update({ where: { id }, data, include: includeCompleto });
 }
 
 // Agrupa las oportunidades por etapa para el tablero del embudo comercial.
@@ -103,15 +84,33 @@ export function cambiarEtapa(params: {
   usuarioId: number;
   observacion?: string;
   camposDerivados?: Prisma.OportunidadUncheckedUpdateInput;
+  camposActualizacion?: Prisma.OportunidadUncheckedUpdateInput;
+  empresaIdToClear?: number | null;
 }) {
-  const { oportunidadId, etapaAnteriorId, etapaNuevaId, usuarioId, observacion, camposDerivados } = params;
+  const {
+    oportunidadId,
+    etapaAnteriorId,
+    etapaNuevaId,
+    usuarioId,
+    observacion,
+    camposDerivados,
+    camposActualizacion,
+    empresaIdToClear,
+  } = params;
 
   return prisma.$transaction(async (tx) => {
     const oportunidad = await tx.oportunidad.update({
       where: { id: oportunidadId },
-      data: { etapaId: etapaNuevaId, ...camposDerivados },
+      data: { etapaId: etapaNuevaId, ...camposActualizacion, ...camposDerivados },
       include: includeCompleto,
     });
+
+    if (empresaIdToClear != null) {
+      await tx.empresa.update({
+        where: { id: empresaIdToClear },
+        data: { oportunidadAbiertaId: null },
+      });
+    }
 
     await tx.historialEtapa.create({
       data: {

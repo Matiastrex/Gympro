@@ -15,6 +15,7 @@ export const oportunidadSchema = z.object({
   probabilidadCierre: z.number().int().min(0).max(100).optional().nullable(),
   fechaEstimadaCierre: z.string().datetime().optional().nullable(),
   origen: z.string().optional().nullable(),
+  motivoPerdida: z.string().optional().nullable(),
   observaciones: z.string().optional().nullable(),
 });
 
@@ -43,16 +44,31 @@ export function crear(data: OportunidadInput) {
   return oportunidadesRepo.create(data as any);
 }
 
-export async function actualizar(id: number, data: OportunidadInput) {
+export async function actualizar(id: number, data: OportunidadInput, usuarioId: number) {
   const oportunidad = await obtener(id);
   validarRelacionComercial(data);
 
   const etapa = await oportunidadesRepo.findEtapaTipo(data.etapaId);
   if (!etapa) throw ApiError.notFound("Etapa no encontrada");
+  if (etapa.tipo == "PERDIDA" && !data.motivoPerdida) {
+    throw ApiError.badRequest("Hay que indicar un motivo para cerrar la oportunidad");
+  }
 
-  // Si la oportunidad corresponde a una empresa y se está cerrando, limpiar Empresa.oportunidadAbiertaId.
-  const empresaIdToClear = etapa.tipo !== "ABIERTA" ? oportunidad.empresaId : null;
-  return oportunidadesRepo.update(id, data as any, empresaIdToClear);
+  const { etapaId, motivoPerdida, ...camposActualizacion } = data;
+  const motivo = etapa.tipo === "PERDIDA" ? motivoPerdida : null;
+
+  if (etapaId !== oportunidad.etapaId) {
+    return cambiarEtapa({
+      oportunidadId: id,
+      etapaNuevaId: etapaId,
+      usuarioId,
+      observacion: data.observaciones ?? undefined,
+      motivoPerdida: motivo ?? undefined,
+      camposActualizacion: { ...camposActualizacion, motivoPerdida: motivo },
+    });
+  }
+
+  return oportunidadesRepo.update(id, { ...camposActualizacion, motivoPerdida: motivo } as any);
 }
 
 export function tableroEmbudo() {
@@ -65,6 +81,7 @@ export async function cambiarEtapa(params: {
   usuarioId: number;
   observacion?: string;
   motivoPerdida?: string;
+  camposActualizacion?: Prisma.OportunidadUncheckedUpdateInput;
 }) {
   const oportunidad = await obtener(params.oportunidadId);
 
@@ -77,6 +94,9 @@ export async function cambiarEtapa(params: {
 
   const etapaNueva = await prisma.etapa.findUnique({ where: { id: params.etapaNuevaId } });
   if (!etapaNueva) throw ApiError.notFound("Etapa no encontrada");
+  if (etapaNueva.tipo == "PERDIDA" && !params.motivoPerdida) {
+    throw ApiError.badRequest("Hay que indicar un motivo para cerrar la oportunidad");
+  }
 
   // Si la nueva etapa es de cierre (Ganada/Perdida), derivamos el estado y
   // la fecha real de cierre automáticamente, tal como exige la consigna.
@@ -85,13 +105,12 @@ export async function cambiarEtapa(params: {
     camposDerivados.estado = "GANADA";
     camposDerivados.fechaRealCierre = new Date();
   } else if (etapaNueva.tipo === "PERDIDA") {
-    if (!params.motivoPerdida) {
-      throw ApiError.badRequest("Hay que indicar un motivo de pérdida para cerrar la oportunidad como perdida");
-    }
     camposDerivados.estado = "PERDIDA";
     camposDerivados.fechaRealCierre = new Date();
     camposDerivados.motivoPerdida = params.motivoPerdida;
   }
+
+  const empresaIdToClear = etapaNueva.tipo !== "ABIERTA" ? oportunidad.empresaId : null;
 
   return oportunidadesRepo.cambiarEtapa({
     oportunidadId: params.oportunidadId,
@@ -100,5 +119,7 @@ export async function cambiarEtapa(params: {
     usuarioId: params.usuarioId,
     observacion: params.observacion,
     camposDerivados,
+    camposActualizacion: params.camposActualizacion,
+    empresaIdToClear,
   });
 }

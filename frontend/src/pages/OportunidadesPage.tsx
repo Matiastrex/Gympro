@@ -10,6 +10,7 @@ interface Opcion {
   nombre?: string;
   apellido?: string;
   razonSocial?: string;
+  tipo?: string;
 }
 
 interface Oportunidad {
@@ -28,6 +29,7 @@ interface Oportunidad {
   productoId?: number | null;
   producto?: { nombre: string } | null;
   origen?: string | null;
+  motivoPerdida?: string | null;
   observaciones?: string | null;
 }
 
@@ -49,6 +51,7 @@ const formVacio = {
   responsableId: "",
   etapaId: "",
   valorEstimado: "",
+  motivoPerdida: "",
   observaciones: "",
 };
 
@@ -110,6 +113,7 @@ export function OportunidadesPage() {
       responsableId: o.responsableId ? String(o.responsableId) : "",
       etapaId: String(o.etapaId),
       valorEstimado: o.valorEstimado != null ? String(o.valorEstimado) : "",
+      motivoPerdida: o.motivoPerdida ?? "",
       observaciones: o.observaciones ?? "",
     });
     setError(null);
@@ -136,6 +140,7 @@ export function OportunidadesPage() {
       responsableId: form.responsableId ? Number(form.responsableId) : null,
       etapaId: Number(form.etapaId),
       valorEstimado: form.valorEstimado ? Number(form.valorEstimado) : null,
+      motivoPerdida: editando && etapas.find((et) => et.id === Number(form.etapaId))?.tipo == "PERDIDA" ? form.motivoPerdida || null : null,
       observaciones: form.observaciones || null,
     };
     try {
@@ -153,6 +158,8 @@ export function OportunidadesPage() {
   }
 
   const formActivo = mostrarForm || editando !== null;
+  const etapaSeleccionada = etapas.find((et) => et.id === Number(form.etapaId));
+  const mostrarMotivoPerdida = editando !== null && etapaSeleccionada?.tipo == "PERDIDA";
 
   return (
     <div className="container">
@@ -238,11 +245,19 @@ export function OportunidadesPage() {
               </label>
               <label>
                 Etapa *
-                <select required value={form.etapaId} onChange={(e) => setForm({ ...form, etapaId: e.target.value })}>
+                <select
+                  required
+                  value={form.etapaId}
+                  onChange={(e) => {
+                    const etapaId = e.target.value;
+                    const etapa = etapas.find((et) => et.id === Number(etapaId));
+                    setForm({ ...form, etapaId, motivoPerdida: etapa?.tipo === "ABIERTA" ? "" : form.motivoPerdida });
+                  }}
+                >
                   <option value="">Elegir...</option>
                   {etapas.map((et) => (
                     <option key={et.id} value={et.id}>
-                      {et.nombre}
+                      {et.nombre} 
                     </option>
                   ))}
                 </select>
@@ -258,6 +273,12 @@ export function OportunidadesPage() {
                   ))}
                 </select>
               </label>
+              {mostrarMotivoPerdida && (
+                <label className="span-2">
+                  Motivo de pérdida *
+                  <textarea required value={form.motivoPerdida} onChange={(e) => setForm({ ...form, motivoPerdida: e.target.value })} />
+                </label>
+              )}
               <label>
                 Contacto
                 <select value={form.contactoId} onChange={(e) => setForm({ ...form, contactoId: e.target.value })}>
