@@ -62,6 +62,20 @@ export function findEtapaTipo(id: number) {
   return prisma.etapa.findUnique({ where: { id }, select: { tipo: true } });
 }
 
+export function findContactoParaCrear(id: number) {
+  return prisma.contacto.findUnique({
+    where: { id },
+    select: { estado: true, oportunidadAbiertaId: true, empresaId: true },
+  });
+}
+
+export function findEmpresaParaCrear(id: number) {
+  return prisma.empresa.findUnique({
+    where: { id },
+    select: { estado: true, oportunidadAbiertaId: true },
+  });
+}
+
 export function update(id: number, data: Prisma.OportunidadUpdateInput) {
   return prisma.oportunidad.update({ where: { id }, data, include: includeCompleto });
 }

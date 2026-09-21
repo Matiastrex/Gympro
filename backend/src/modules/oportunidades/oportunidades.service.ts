@@ -39,8 +39,32 @@ function validarRelacionComercial(data: OportunidadInput) {
   }
 }
 
-export function crear(data: OportunidadInput) {
+export async function crear(data: OportunidadInput) {
   validarRelacionComercial(data);
+
+  if (data.contactoId != null) {
+    const contacto = await oportunidadesRepo.findContactoParaCrear(data.contactoId);
+    if (contacto?.estado === "CLIENTE") {
+      throw ApiError.badRequest("El contacto ya es cliente");
+    }
+    if (contacto?.oportunidadAbiertaId != null) {
+      throw ApiError.badRequest("El contacto ya tiene una oportunidad abierta");
+    }
+    if (contacto?.empresaId != null) {
+      throw ApiError.badRequest("El contacto tiene convenio corporativo");
+    }
+  }
+
+  if (data.empresaId != null) {
+    const empresa = await oportunidadesRepo.findEmpresaParaCrear(data.empresaId);
+    if (empresa?.estado === "CLIENTE") {
+      throw ApiError.badRequest("La empresa ya es cliente");
+    }
+    if (empresa?.oportunidadAbiertaId != null) {
+      throw ApiError.badRequest("La empresa ya tiene una oportunidad abierta");
+    }
+  }
+
   return oportunidadesRepo.create(data as any);
 }
 
