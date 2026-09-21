@@ -42,6 +42,9 @@ function validarRelacionComercial(data: OportunidadInput) {
 export async function crear(data: OportunidadInput) {
   validarRelacionComercial(data);
 
+  const etapa = await oportunidadesRepo.findEtapaTipo(data.etapaId);
+  if (!etapa) throw ApiError.notFound("Etapa no encontrada");
+
   if (data.contactoId != null) {
     const contacto = await oportunidadesRepo.findContactoParaCrear(data.contactoId);
     if (contacto?.estado === "CLIENTE") {
@@ -65,7 +68,13 @@ export async function crear(data: OportunidadInput) {
     }
   }
 
-  return oportunidadesRepo.create(data as any);
+  const estadoEntidad = etapa.tipo === "GANADA"
+    ? "CLIENTE"
+    : etapa.tipo === "PERDIDA"
+      ? "INACTIVO"
+      : "POTENCIAL";
+
+  return oportunidadesRepo.create(data as any, estadoEntidad);
 }
 
 export async function actualizar(id: number, data: OportunidadInput, usuarioId: number) {
@@ -136,6 +145,11 @@ export async function cambiarEtapa(params: {
 
   const empresaIdToClear = etapaNueva.tipo !== "ABIERTA" ? oportunidad.empresaId : null;
   const contactoIdToClear = etapaNueva.tipo !== "ABIERTA" ? oportunidad.contactoId : null;
+  const estadoEntidad = etapaNueva.tipo === "GANADA"
+    ? "CLIENTE"
+    : etapaNueva.tipo === "PERDIDA"
+      ? "INACTIVO"
+      : "POTENCIAL";
 
   return oportunidadesRepo.cambiarEtapa({
     oportunidadId: params.oportunidadId,
@@ -147,5 +161,8 @@ export async function cambiarEtapa(params: {
     camposActualizacion: params.camposActualizacion,
     empresaIdToClear,
     contactoIdToClear,
+    empresaIdToUpdate: oportunidad.empresaId,
+    contactoIdToUpdate: oportunidad.contactoId,
+    estadoEntidad,
   });
 }

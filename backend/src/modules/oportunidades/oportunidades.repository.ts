@@ -34,7 +34,10 @@ export function findById(id: number) {
   });
 }
 
-export function create(data: Prisma.OportunidadCreateInput) {
+export function create(
+  data: Prisma.OportunidadCreateInput,
+  estadoEntidad: "CLIENTE" | "INACTIVO" | "POTENCIAL"
+) {
   return prisma.$transaction(async (tx) => {
     const oportunidad = await tx.oportunidad.create({ data, include: includeCompleto });
     const empresaId = (data as unknown as Prisma.OportunidadUncheckedCreateInput).empresaId;
@@ -43,14 +46,19 @@ export function create(data: Prisma.OportunidadCreateInput) {
     if (empresaId != null) {
       await tx.empresa.update({
         where: { id: empresaId },
-        data: { oportunidadAbiertaId: oportunidad.id },
+        data: { oportunidadAbiertaId: oportunidad.id, estado: estadoEntidad },
+      });
+
+      await tx.contacto.updateMany({
+        where: { empresaId },
+        data: { estado: estadoEntidad },
       });
     }
 
     if (contactoId != null) {
       await tx.contacto.update({
         where: { id: contactoId },
-        data: { oportunidadAbiertaId: oportunidad.id },
+        data: { oportunidadAbiertaId: oportunidad.id, estado: estadoEntidad },
       });
     }
 
@@ -109,6 +117,9 @@ export function cambiarEtapa(params: {
   camposActualizacion?: Prisma.OportunidadUncheckedUpdateInput;
   empresaIdToClear?: number | null;
   contactoIdToClear?: number | null;
+  empresaIdToUpdate?: number | null;
+  contactoIdToUpdate?: number | null;
+  estadoEntidad?: "CLIENTE" | "INACTIVO" | "POTENCIAL";
 }) {
   const {
     oportunidadId,
@@ -120,6 +131,9 @@ export function cambiarEtapa(params: {
     camposActualizacion,
     empresaIdToClear,
     contactoIdToClear,
+    empresaIdToUpdate,
+    contactoIdToUpdate,
+    estadoEntidad,
   } = params;
 
   return prisma.$transaction(async (tx) => {
@@ -129,17 +143,28 @@ export function cambiarEtapa(params: {
       include: includeCompleto,
     });
 
-    if (empresaIdToClear != null) {
+    if (empresaIdToUpdate != null) {
       await tx.empresa.update({
-        where: { id: empresaIdToClear },
-        data: { oportunidadAbiertaId: null },
+        where: { id: empresaIdToUpdate },
+        data: {
+          estado: estadoEntidad,
+          ...(empresaIdToClear != null ? { oportunidadAbiertaId: null } : {}),
+        },
+      });
+
+      await tx.contacto.updateMany({
+        where: { empresaId: empresaIdToUpdate },
+        data: { estado: estadoEntidad },
       });
     }
 
-    if (contactoIdToClear != null) {
+    if (contactoIdToUpdate != null) {
       await tx.contacto.update({
-        where: { id: contactoIdToClear },
-        data: { oportunidadAbiertaId: null },
+        where: { id: contactoIdToUpdate },
+        data: {
+          estado: estadoEntidad,
+          ...(contactoIdToClear != null ? { oportunidadAbiertaId: null } : {}),
+        },
       });
     }
 
