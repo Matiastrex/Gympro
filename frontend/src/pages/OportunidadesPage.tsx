@@ -281,7 +281,11 @@ export function OportunidadesPage() {
               )}
               <label>
                 Contacto
-                <select value={form.contactoId} onChange={(e) => setForm({ ...form, contactoId: e.target.value })}>
+                <select
+                  disabled={editando ? true : false}
+                  value={form.contactoId}
+                  onChange={(e) => setForm({ ...form, contactoId: e.target.value, empresaId: "" })}
+                >
                   <option value="">— ninguno —</option>
                   {contactos.map((c) => (
                     <option key={c.id} value={c.id}>
@@ -292,7 +296,11 @@ export function OportunidadesPage() {
               </label>
               <label>
                 Empresa (convenio corporativo)
-                <select value={form.empresaId} onChange={(e) => setForm({ ...form, empresaId: e.target.value })}>
+                <select
+                  disabled={editando ? true : false}
+                  value={form.empresaId}
+                  onChange={(e) => setForm({ ...form, empresaId: e.target.value, contactoId: "" })}
+                >
                   <option value="">— ninguna —</option>
                   {empresas.map((emp) => (
                     <option key={emp.id} value={emp.id}>
