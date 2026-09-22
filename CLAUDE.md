@@ -114,3 +114,43 @@ via `localStorage`). `src/api/client.ts` is a single Axios instance: it attaches
 
 The frontend has no routing/pages beyond empresas, contactos, oportunidades, and the embudo board,
 matching the backend's current MVP scope.
+
+## Known bugs to fix
+
+- **Creating or editing an oportunidad with a direct `etapaId` bypasses every `cambiarEtapa` business
+  rule.** Both `oportunidadesService.crear()` (`POST /api/oportunidades`) and `actualizar()`
+  (`PUT /api/oportunidades/:id`, submitted by the "Nueva oportunidad" / "Editar oportunidad" modals in
+  `OportunidadesPage.tsx`) write `etapaId` straight through the repository instead of going through
+  `cambiarEtapa()`, which is the only place that derives `estado`/`fechaRealCierre`, enforces
+  `motivoPerdida`, blocks changes once closed, and writes the `HistorialEtapa` audit row. Confirmed two
+  ways:
+  - Live in the current dev database: oportunidad id 12 ("Empleado Textil") sits in etapa "Inscripto"
+    (`tipo: GANADA`) with `estado: "ABIERTA"` and `fechaRealCierre: null`, because it was created
+    directly into that stage instead of moved there via `cambiar-etapa`.
+  - Reproduced via the API: an oportunidad moved to GANADA through `cambiar-etapa` (correctly getting
+    `estado: GANADA` + `fechaRealCierre`) and then edited back to an open etapa through the plain `PUT`
+    keeps `estado: GANADA` (now sitting in an open-type etapa) and adds **no** new `HistorialEtapa` row.
+  Either way, the embudo board and the oportunidades table end up disagreeing about whether the deal is
+  still open. Fix by having `crear()`/`actualizar()` derive `estado`/`fechaRealCierre` (and require
+  `motivoPerdida` for a PERDIDA etapa) the same way `cambiarEtapa()` does, or by stripping `etapaId` from
+  the general create/edit payload and forcing all stage assignment through `cambiar-etapa`.
+
+- **`probabilidadCierre` and `fechaEstimadaCierre` have no input anywhere in the UI.** Both fields
+  exist on `Oportunidad` and are rendered on the embudo cards (the progress-bar percentage and the date
+  pill), but `OportunidadesPage.tsx`'s create/edit form (`formVacio` and its submit `payload`) never
+  includes them, so every oportunidad created or edited through the app has both permanently `null`.
+  The embudo board silently falls back to an etapa-order heuristic for the percentage and shows "Sin
+  fecha estimada" forever. Add inputs for these two fields to the oportunidad form.
+
+- **The baja lógica endpoints for contactos/empresas are unreachable from the UI.**
+  `POST /api/contactos/:id/baja` and `POST /api/empresas/:id/baja` exist and do a soft-delete
+  (`estado: INACTIVO`), but neither `ContactosPage.tsx` nor `EmpresasPage.tsx` ever calls them — the
+  only way to "dar de baja" a record today is to open the edit modal and manually pick `INACTIVO` from
+  the Estado dropdown. Either wire a "Dar de baja" action to the existing endpoint, or remove it if the
+  generic edit form is meant to be the only path.
+
+- **`CORS_ORIGIN`'s default doesn't track Vite's actual port.** `backend/src/config/env.ts` defaults
+  `corsOrigin` to `http://localhost:5173`, but Vite auto-increments to 5174+ whenever 5173 is already
+  taken (observed firsthand running this repo's dev servers) — when that happens every API request from
+  the frontend is blocked by CORS until `.env`'s `CORS_ORIGIN` is updated by hand. Worth a callout in
+  the setup docs, or making the mismatch fail with a clearer error.
