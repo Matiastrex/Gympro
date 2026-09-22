@@ -8,6 +8,7 @@ import { PencilIcon, SearchIcon } from "../components/icons";
 interface Empresa {
   id: number;
   razonSocial: string;
+  estado: string;
 }
 
 interface Contacto {
@@ -21,6 +22,7 @@ interface Contacto {
   estado: string;
   origen?: string | null;
   observaciones?: string | null;
+  oportunidadAbiertaId?: number | null;
   empresaId?: number | null;
   empresa?: { id: number; razonSocial: string } | null;
 }
@@ -102,7 +104,11 @@ export function ContactosPage() {
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
-    const payload = { ...form, empresaId: form.empresaId ? Number(form.empresaId) : null };
+    const payload = {
+      ...form,
+      empresaId: form.empresaId ? Number(form.empresaId) : null,
+      estado: estadoPorEmpresa ?? form.estado,
+    };
     try {
       if (editando) {
         await api.put(`/contactos/${editando.id}`, payload);
@@ -118,6 +124,19 @@ export function ContactosPage() {
   }
 
   const formActivo = mostrarForm || editando !== null;
+  const empresaSeleccionada = empresas.find((empresa) => empresa.id === Number(form.empresaId));
+  const estadoPorEmpresa = empresaSeleccionada
+    ? empresaSeleccionada.estado === "NO_CONTACTAR"
+      ? "INACTIVO"
+      : empresaSeleccionada.estado
+    : null;
+  const estadoBloqueadoPorOportunidad = !empresaSeleccionada && editando?.oportunidadAbiertaId != null;
+  const estadoBloqueado = Boolean(empresaSeleccionada) || estadoBloqueadoPorOportunidad;
+  const estadoLabel = empresaSeleccionada
+    ? "Estado (por empresa)"
+    : estadoBloqueadoPorOportunidad
+      ? "Estado (Oportunidad abierta)"
+      : "Estado";
 
   return (
     <div className="container">
@@ -216,7 +235,7 @@ export function ContactosPage() {
                 <input value={form.cargo} onChange={(e) => setForm({ ...form, cargo: e.target.value })} />
               </label>
               <label>
-                Empresa (solo si es un convenio corporativo)
+                Convenio corporativo
                 <select value={form.empresaId} onChange={(e) => setForm({ ...form, empresaId: e.target.value })}>
                   <option value="">Cliente individual</option>
                   {empresas.map((emp) => (
@@ -227,8 +246,12 @@ export function ContactosPage() {
                 </select>
               </label>
               <label>
-                Estado
-                <select value={form.estado} onChange={(e) => setForm({ ...form, estado: e.target.value })}>
+                {estadoLabel}
+                <select
+                  disabled={estadoBloqueado}
+                  value={estadoPorEmpresa ?? form.estado}
+                  onChange={(e) => setForm({ ...form, estado: e.target.value })}
+                >
                   {ESTADOS.map((es) => (
                     <option key={es} value={es}>
                       {es}

@@ -14,6 +14,7 @@ interface Empresa {
   direccion?: string | null;
   sitioWeb?: string | null;
   estado: string;
+  oportunidadAbiertaId?: number | null;
   origen?: string | null;
   observaciones?: string | null;
 }
@@ -108,6 +109,7 @@ export function EmpresasPage() {
   }
 
   const formActivo = mostrarForm || editando !== null;
+  const estadoBloqueado = editando?.oportunidadAbiertaId != null;
 
   return (
     <div className="container">
@@ -189,8 +191,8 @@ export function EmpresasPage() {
                 <input value={form.industria} onChange={(e) => setForm({ ...form, industria: e.target.value })} />
               </label>
               <label>
-                Estado
-                <select value={form.estado} onChange={(e) => setForm({ ...form, estado: e.target.value })}>
+                Estado{estadoBloqueado ? " (oportunidad abierta)" : ""}
+                <select disabled={estadoBloqueado} value={form.estado} onChange={(e) => setForm({ ...form, estado: e.target.value })}>
                   {ESTADOS.map((es) => (
                     <option key={es} value={es}>
                       {es}

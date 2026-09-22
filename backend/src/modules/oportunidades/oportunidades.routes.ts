@@ -35,7 +35,7 @@ oportunidadesRouter.put(
   "/:id",
   asyncHandler(async (req, res) => {
     const data = oportunidadesService.oportunidadSchema.parse(req.body);
-    res.json(await oportunidadesService.actualizar(Number(req.params.id), data));
+    res.json(await oportunidadesService.actualizar(Number(req.params.id), data, req.user!.userId));
   })
 );
 

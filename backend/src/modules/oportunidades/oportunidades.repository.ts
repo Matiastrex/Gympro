@@ -34,8 +34,54 @@ export function findById(id: number) {
   });
 }
 
-export function create(data: Prisma.OportunidadCreateInput) {
-  return prisma.oportunidad.create({ data, include: includeCompleto });
+export function create(
+  data: Prisma.OportunidadCreateInput,
+  estadoEntidad: "CLIENTE" | "INACTIVO" | "POTENCIAL"
+) {
+  return prisma.$transaction(async (tx) => {
+    const oportunidad = await tx.oportunidad.create({ data, include: includeCompleto });
+    const empresaId = (data as unknown as Prisma.OportunidadUncheckedCreateInput).empresaId;
+    const contactoId = (data as unknown as Prisma.OportunidadUncheckedCreateInput).contactoId;
+
+    if (empresaId != null) {
+      await tx.empresa.update({
+        where: { id: empresaId },
+        data: { oportunidadAbiertaId: oportunidad.id, estado: estadoEntidad },
+      });
+
+      await tx.contacto.updateMany({
+        where: { empresaId },
+        data: { estado: estadoEntidad },
+      });
+    }
+
+    if (contactoId != null) {
+      await tx.contacto.update({
+        where: { id: contactoId },
+        data: { oportunidadAbiertaId: oportunidad.id, estado: estadoEntidad },
+      });
+    }
+
+    return oportunidad;
+  });
+}
+
+export function findEtapaTipo(id: number) {
+  return prisma.etapa.findUnique({ where: { id }, select: { tipo: true } });
+}
+
+export function findContactoParaCrear(id: number) {
+  return prisma.contacto.findUnique({
+    where: { id },
+    select: { estado: true, oportunidadAbiertaId: true, empresaId: true },
+  });
+}
+
+export function findEmpresaParaCrear(id: number) {
+  return prisma.empresa.findUnique({
+    where: { id },
+    select: { estado: true, oportunidadAbiertaId: true },
+  });
 }
 
 export function update(id: number, data: Prisma.OportunidadUpdateInput) {
@@ -68,15 +114,59 @@ export function cambiarEtapa(params: {
   usuarioId: number;
   observacion?: string;
   camposDerivados?: Prisma.OportunidadUncheckedUpdateInput;
+  camposActualizacion?: Prisma.OportunidadUncheckedUpdateInput;
+  empresaIdToClear?: number | null;
+  contactoIdToClear?: number | null;
+  empresaIdToUpdate?: number | null;
+  contactoIdToUpdate?: number | null;
+  estadoEntidad?: "CLIENTE" | "INACTIVO" | "POTENCIAL";
 }) {
-  const { oportunidadId, etapaAnteriorId, etapaNuevaId, usuarioId, observacion, camposDerivados } = params;
+  const {
+    oportunidadId,
+    etapaAnteriorId,
+    etapaNuevaId,
+    usuarioId,
+    observacion,
+    camposDerivados,
+    camposActualizacion,
+    empresaIdToClear,
+    contactoIdToClear,
+    empresaIdToUpdate,
+    contactoIdToUpdate,
+    estadoEntidad,
+  } = params;
 
   return prisma.$transaction(async (tx) => {
     const oportunidad = await tx.oportunidad.update({
       where: { id: oportunidadId },
-      data: { etapaId: etapaNuevaId, ...camposDerivados },
+      data: { etapaId: etapaNuevaId, ...camposActualizacion, ...camposDerivados },
       include: includeCompleto,
     });
+
+    if (empresaIdToUpdate != null) {
+      await tx.empresa.update({
+        where: { id: empresaIdToUpdate },
+        data: {
+          estado: estadoEntidad,
+          ...(empresaIdToClear != null ? { oportunidadAbiertaId: null } : {}),
+        },
+      });
+
+      await tx.contacto.updateMany({
+        where: { empresaId: empresaIdToUpdate },
+        data: { estado: estadoEntidad },
+      });
+    }
+
+    if (contactoIdToUpdate != null) {
+      await tx.contacto.update({
+        where: { id: contactoIdToUpdate },
+        data: {
+          estado: estadoEntidad,
+          ...(contactoIdToClear != null ? { oportunidadAbiertaId: null } : {}),
+        },
+      });
+    }
 
     await tx.historialEtapa.create({
       data: {

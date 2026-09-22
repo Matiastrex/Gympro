@@ -15,6 +15,7 @@ export const oportunidadSchema = z.object({
   probabilidadCierre: z.number().int().min(0).max(100).optional().nullable(),
   fechaEstimadaCierre: z.string().datetime().optional().nullable(),
   origen: z.string().optional().nullable(),
+  motivoPerdida: z.string().optional().nullable(),
   observaciones: z.string().optional().nullable(),
 });
 
@@ -38,15 +39,69 @@ function validarRelacionComercial(data: OportunidadInput) {
   }
 }
 
-export function crear(data: OportunidadInput) {
+export async function crear(data: OportunidadInput) {
   validarRelacionComercial(data);
-  return oportunidadesRepo.create(data as any);
+
+  const etapa = await oportunidadesRepo.findEtapaTipo(data.etapaId);
+  if (!etapa) throw ApiError.notFound("Etapa no encontrada");
+
+  if (data.contactoId != null) {
+    const contacto = await oportunidadesRepo.findContactoParaCrear(data.contactoId);
+    if (contacto?.estado === "CLIENTE") {
+      throw ApiError.badRequest("El contacto ya es cliente");
+    }
+    if (contacto?.oportunidadAbiertaId != null) {
+      throw ApiError.badRequest("El contacto ya tiene una oportunidad abierta");
+    }
+    if (contacto?.empresaId != null) {
+      throw ApiError.badRequest("El contacto tiene convenio corporativo");
+    }
+  }
+
+  if (data.empresaId != null) {
+    const empresa = await oportunidadesRepo.findEmpresaParaCrear(data.empresaId);
+    if (empresa?.estado === "CLIENTE") {
+      throw ApiError.badRequest("La empresa ya es cliente");
+    }
+    if (empresa?.oportunidadAbiertaId != null) {
+      throw ApiError.badRequest("La empresa ya tiene una oportunidad abierta");
+    }
+  }
+
+  const estadoEntidad = etapa.tipo === "GANADA"
+    ? "CLIENTE"
+    : etapa.tipo === "PERDIDA"
+      ? "INACTIVO"
+      : "POTENCIAL";
+
+  return oportunidadesRepo.create(data as any, estadoEntidad);
 }
 
-export async function actualizar(id: number, data: OportunidadInput) {
-  await obtener(id);
+export async function actualizar(id: number, data: OportunidadInput, usuarioId: number) {
+  const oportunidad = await obtener(id);
   validarRelacionComercial(data);
-  return oportunidadesRepo.update(id, data as any);
+
+  const etapa = await oportunidadesRepo.findEtapaTipo(data.etapaId);
+  if (!etapa) throw ApiError.notFound("Etapa no encontrada");
+  if (etapa.tipo == "PERDIDA" && !data.motivoPerdida) {
+    throw ApiError.badRequest("Hay que indicar un motivo para cerrar la oportunidad");
+  }
+
+  const { etapaId, motivoPerdida, ...camposActualizacion } = data;
+  const motivo = etapa.tipo === "PERDIDA" ? motivoPerdida : null;
+
+  if (etapaId !== oportunidad.etapaId) {
+    return cambiarEtapa({
+      oportunidadId: id,
+      etapaNuevaId: etapaId,
+      usuarioId,
+      observacion: data.observaciones ?? undefined,
+      motivoPerdida: motivo ?? undefined,
+      camposActualizacion: { ...camposActualizacion, motivoPerdida: motivo },
+    });
+  }
+
+  return oportunidadesRepo.update(id, { ...camposActualizacion, motivoPerdida: motivo } as any);
 }
 
 export function tableroEmbudo() {
@@ -59,6 +114,7 @@ export async function cambiarEtapa(params: {
   usuarioId: number;
   observacion?: string;
   motivoPerdida?: string;
+  camposActualizacion?: Prisma.OportunidadUncheckedUpdateInput;
 }) {
   const oportunidad = await obtener(params.oportunidadId);
 
@@ -71,6 +127,9 @@ export async function cambiarEtapa(params: {
 
   const etapaNueva = await prisma.etapa.findUnique({ where: { id: params.etapaNuevaId } });
   if (!etapaNueva) throw ApiError.notFound("Etapa no encontrada");
+  if (etapaNueva.tipo == "PERDIDA" && !params.motivoPerdida) {
+    throw ApiError.badRequest("Hay que indicar un motivo para cerrar la oportunidad");
+  }
 
   // Si la nueva etapa es de cierre (Ganada/Perdida), derivamos el estado y
   // la fecha real de cierre automáticamente, tal como exige la consigna.
@@ -79,13 +138,18 @@ export async function cambiarEtapa(params: {
     camposDerivados.estado = "GANADA";
     camposDerivados.fechaRealCierre = new Date();
   } else if (etapaNueva.tipo === "PERDIDA") {
-    if (!params.motivoPerdida) {
-      throw ApiError.badRequest("Hay que indicar un motivo de pérdida para cerrar la oportunidad como perdida");
-    }
     camposDerivados.estado = "PERDIDA";
     camposDerivados.fechaRealCierre = new Date();
     camposDerivados.motivoPerdida = params.motivoPerdida;
   }
+
+  const empresaIdToClear = etapaNueva.tipo !== "ABIERTA" ? oportunidad.empresaId : null;
+  const contactoIdToClear = etapaNueva.tipo !== "ABIERTA" ? oportunidad.contactoId : null;
+  const estadoEntidad = etapaNueva.tipo === "GANADA"
+    ? "CLIENTE"
+    : etapaNueva.tipo === "PERDIDA"
+      ? "INACTIVO"
+      : "POTENCIAL";
 
   return oportunidadesRepo.cambiarEtapa({
     oportunidadId: params.oportunidadId,
@@ -94,5 +158,11 @@ export async function cambiarEtapa(params: {
     usuarioId: params.usuarioId,
     observacion: params.observacion,
     camposDerivados,
+    camposActualizacion: params.camposActualizacion,
+    empresaIdToClear,
+    contactoIdToClear,
+    empresaIdToUpdate: oportunidad.empresaId,
+    contactoIdToUpdate: oportunidad.contactoId,
+    estadoEntidad,
   });
 }

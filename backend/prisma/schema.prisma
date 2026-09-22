@@ -66,6 +66,7 @@ model Usuario {
 model Empresa {
   id            Int           @id @default(autoincrement())
   razonSocial   String
+  oportunidadAbiertaId Int?
   cuit          String?
   industria     String?
   email         String?
@@ -92,6 +93,7 @@ model Contacto {
   id            Int           @id @default(autoincrement())
   nombre        String
   apellido      String
+  oportunidadAbiertaId Int?
   documento     String?
   cargo         String?
   email         String?
