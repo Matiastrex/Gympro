@@ -3,6 +3,7 @@ import { api } from "../api/client";
 import { Modal } from "../components/Modal";
 import { Avatar } from "../components/Avatar";
 import { Badge } from "../components/Badge";
+import { HistorialEtapas, HistorialEtapaItem } from "../components/HistorialEtapas";
 
 interface Etapa {
   id: number;
@@ -34,12 +35,7 @@ interface OportunidadDetalle extends Oportunidad {
   etapa: { nombre: string };
   producto?: { nombre: string } | null;
   observaciones?: string | null;
-  historialEtapas: {
-    id: number;
-    fecha: string;
-    etapaNueva: { nombre: string };
-    usuario: { nombre: string; apellido: string };
-  }[];
+  historialEtapas: HistorialEtapaItem[];
 }
 
 export function EmbudoPage() {
@@ -246,17 +242,7 @@ export function EmbudoPage() {
           )}
           <div className="detail-section">
             <h4>Historial de etapas ({detalle.historialEtapas.length})</h4>
-            <div className="related-list">
-              {detalle.historialEtapas.map((h) => (
-                <div className="related-row" key={h.id}>
-                  <span>{h.etapaNueva.nombre}</span>
-                  <span className="cell-muted">
-                    {new Date(h.fecha).toLocaleDateString("es-AR")} · {h.usuario.nombre}
-                  </span>
-                </div>
-              ))}
-              {detalle.historialEtapas.length === 0 && <p className="cell-muted">Sin cambios de etapa registrados</p>}
-            </div>
+            <HistorialEtapas items={detalle.historialEtapas} />
           </div>
         </Modal>
       )}

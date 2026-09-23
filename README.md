@@ -16,6 +16,9 @@ Implementado:
   producto.
 - Embudo comercial: tablero por etapa, cambio de etapa persistido en la base
   (con historial y derivación automática de Ganada/Perdida).
+- Historial de etapas: registra la creación y cada movimiento con etapa
+  anterior, etapa nueva, usuario, fecha y observación; se consulta desde el
+  detalle de una oportunidad y desde `GET /api/oportunidades/:id/historial`.
 
 Fuera de alcance de esta entrega (planificado para la Entrega Final, ya
 contemplado en el modelo de datos y en la arquitectura para no requerir
@@ -83,6 +86,23 @@ npm run setup
 tipado), `prisma migrate dev` (crea las tablas en tu MySQL) y el seed (carga
 el usuario de prueba, las etapas del embudo y los planes de membresía).
 
+Si la base ya estaba creada antes de incorporar el historial completo, aplicar
+las migraciones pendientes con:
+
+```bash
+npx prisma migrate deploy
+```
+
+Para reemplazar los datos comerciales de la base local con un escenario de
+prueba completo, usar:
+
+```bash
+npm run seed:demo
+```
+
+Este comando conserva el usuario, las etapas y los productos, pero elimina y
+recrea empresas, contactos, oportunidades e historiales comerciales.
+
 Usuario de prueba creado por el seed:
 
 ```
@@ -98,6 +118,30 @@ npm run dev
 
 La API queda escuchando en `http://localhost:4000`. Podés verificar que
 levantó bien entrando a `http://localhost:4000/health`.
+
+## API disponible
+
+Todos los endpoints, salvo login y health check, requieren un token JWT.
+
+```bash
+# Obtener token
+curl -X POST http://localhost:4000/api/auth/login ^
+  -H "Content-Type: application/json" ^
+  -d "{\"email\":\"admin@gympro.com\",\"password\":\"gympro123\"}"
+
+# Consultar oportunidades
+curl http://localhost:4000/api/oportunidades ^
+  -H "Authorization: Bearer TU_TOKEN"
+
+# Consultar historial de una oportunidad
+curl http://localhost:4000/api/oportunidades/1/historial ^
+  -H "Authorization: Bearer TU_TOKEN"
+```
+
+La API incluye autenticación, empresas, contactos, productos, etapas,
+usuarios, oportunidades, cambio de etapa y tablero del embudo. El historial
+se consulta embebido en el detalle de una oportunidad o mediante el endpoint
+específico anterior.
 
 ## 2. Frontend
 

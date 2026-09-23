@@ -39,11 +39,14 @@ function validarRelacionComercial(data: OportunidadInput) {
   }
 }
 
-export async function crear(data: OportunidadInput) {
+export async function crear(data: OportunidadInput, usuarioId: number) {
   validarRelacionComercial(data);
 
   const etapa = await oportunidadesRepo.findEtapaTipo(data.etapaId);
   if (!etapa) throw ApiError.notFound("Etapa no encontrada");
+  if (etapa.tipo === "PERDIDA" && !data.motivoPerdida) {
+    throw ApiError.badRequest("Hay que indicar un motivo para cerrar la oportunidad");
+  }
 
   if (data.contactoId != null) {
     const contacto = await oportunidadesRepo.findContactoParaCrear(data.contactoId);
@@ -74,7 +77,20 @@ export async function crear(data: OportunidadInput) {
       ? "INACTIVO"
       : "POTENCIAL";
 
-  return oportunidadesRepo.create(data as any, estadoEntidad);
+  const estado = etapa.tipo === "GANADA" ? "GANADA" : etapa.tipo === "PERDIDA" ? "PERDIDA" : "ABIERTA";
+  const dataConEstado = {
+    ...data,
+    estado,
+    fechaRealCierre: etapa.tipo === "ABIERTA" ? null : new Date(),
+    motivoPerdida: etapa.tipo === "PERDIDA" ? data.motivoPerdida : null,
+  };
+
+  return oportunidadesRepo.create(dataConEstado as any, estadoEntidad, usuarioId);
+}
+
+export async function historial(oportunidadId: number) {
+  await obtener(oportunidadId);
+  return oportunidadesRepo.findHistorial(oportunidadId);
 }
 
 export async function actualizar(id: number, data: OportunidadInput, usuarioId: number) {
