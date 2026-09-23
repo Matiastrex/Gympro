@@ -422,6 +422,12 @@ textarea { resize: vertical; min-height: 70px; font-family: inherit; }
   padding: 14px;
   display: flex;
   flex-direction: column;
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.board-column.is-dragover {
+  background: var(--brand-wash);
+  border-color: var(--brand);
 }
 
 .board-column-header {
@@ -459,10 +465,22 @@ textarea { resize: vertical; min-height: 70px; font-family: inherit; }
   border-radius: var(--radius-md);
   padding: 14px;
   box-shadow: var(--shadow-card);
-  cursor: pointer;
+  cursor: grab;
   display: flex;
   flex-direction: column;
   gap: 12px;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;
+  user-select: none;
+}
+
+.opp-card:active {
+  cursor: grabbing;
+}
+
+.opp-card.is-dragging {
+  opacity: 0.45;
+  border-style: dashed;
+  border-color: var(--brand);
 }
 
 .opp-card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }

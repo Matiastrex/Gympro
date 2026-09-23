@@ -48,6 +48,8 @@ export function EmbudoPage() {
   const [detalle, setDetalle] = useState<OportunidadDetalle | null>(null);
   const [perdida, setPerdida] = useState<{ oportunidadId: number; etapaNuevaId: number } | null>(null);
   const [motivo, setMotivo] = useState("");
+  const [draggedOportunidadId, setDraggedOportunidadId] = useState<number | null>(null);
+  const [dragOverColumnaId, setDragOverColumnaId] = useState<number | null>(null);
 
   async function cargar() {
     const res = await api.get("/embudo");
@@ -91,12 +93,55 @@ export function EmbudoPage() {
     setDetalle(res.data);
   }
 
+  function handleDragStart(e: React.DragEvent, oportunidadId: number) {
+    e.dataTransfer.setData("text/plain", oportunidadId.toString());
+    e.dataTransfer.effectAllowed = "move";
+    setDraggedOportunidadId(oportunidadId);
+  }
+
+  function handleDragEnd() {
+    setDraggedOportunidadId(null);
+    setDragOverColumnaId(null);
+  }
+
+  function handleDragOver(e: React.DragEvent, etapaId: number) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    if (dragOverColumnaId !== etapaId) {
+      setDragOverColumnaId(etapaId);
+    }
+  }
+
+  function handleDragLeave(e: React.DragEvent, etapaId: number) {
+    // Solo quitamos si salimos del contenedor de la columna
+    if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+    if (dragOverColumnaId === etapaId) {
+      setDragOverColumnaId(null);
+    }
+  }
+
+  function handleDrop(e: React.DragEvent, etapaDestino: Etapa) {
+    e.preventDefault();
+    setDragOverColumnaId(null);
+    const dataId = e.dataTransfer.getData("text/plain") || draggedOportunidadId?.toString();
+    if (!dataId) return;
+
+    const oportunidadId = Number(dataId);
+    // Buscar la oportunidad y ver si ya está en esta etapa
+    const columnaOrigen = columnas.find((c) => c.oportunidades.some((o) => o.id === oportunidadId));
+    if (columnaOrigen && columnaOrigen.etapa.id === etapaDestino.id) {
+      return;
+    }
+
+    handleMover(oportunidadId, etapaDestino.id, etapaDestino.tipo);
+  }
+
   return (
     <div className="container">
       <div className="page-header">
         <div>
           <h2>Embudo comercial</h2>
-          <p>Arrastrá el criterio: elegí la próxima etapa de cada consulta desde la tarjeta.</p>
+          <p>Arrastrá las tarjetas entre columnas o elegí la próxima etapa desde el menú desplegable.</p>
         </div>
       </div>
 
@@ -106,8 +151,16 @@ export function EmbudoPage() {
         {columnas.map(({ etapa, oportunidades }) => {
           const progresoEtapa = Math.round((etapa.orden / totalEtapas) * 100);
           const cerradaClass = etapa.tipo === "GANADA" ? "is-won" : etapa.tipo === "PERDIDA" ? "is-lost" : "";
+          const isDragOver = dragOverColumnaId === etapa.id;
+
           return (
-            <div className="board-column" key={etapa.id}>
+            <div
+              className={`board-column ${isDragOver ? "is-dragover" : ""}`}
+              key={etapa.id}
+              onDragOver={(e) => handleDragOver(e, etapa.id)}
+              onDragLeave={(e) => handleDragLeave(e, etapa.id)}
+              onDrop={(e) => handleDrop(e, etapa)}
+            >
               <div className="board-column-header">
                 <span className={`board-column-dot ${cerradaClass}`} />
                 <h3>{etapa.nombre}</h3>
@@ -125,9 +178,17 @@ export function EmbudoPage() {
                       ? "Sin fecha estimada"
                       : "Sin fecha de cierre";
                   const fechaClass = !fechaFoco ? "is-unset" : cerradaClass;
+                  const isBeingDragged = draggedOportunidadId === o.id;
 
                   return (
-                    <div className="opp-card" key={o.id} onClick={() => abrirDetalle(o.id)}>
+                    <div
+                      className={`opp-card ${isBeingDragged ? "is-dragging" : ""}`}
+                      key={o.id}
+                      draggable
+                      onDragStart={(e) => handleDragStart(e, o.id)}
+                      onDragEnd={handleDragEnd}
+                      onClick={() => abrirDetalle(o.id)}
+                    >
                       <div className="opp-card-head">
                         <div className="opp-card-heading">
                           <span className="opp-card-title">{o.titulo}</span>
@@ -139,6 +200,8 @@ export function EmbudoPage() {
                           <select
                             className="opp-card-move"
                             defaultValue=""
+                            draggable={false}
+                            onDragStart={(e) => e.stopPropagation()}
                             onClick={(e) => e.stopPropagation()}
                             onChange={(e) => {
                               const [id, tipo] = e.target.value.split("|");
