@@ -150,6 +150,8 @@ export async function cambiarEtapa(params: {
   // Si la nueva etapa es de cierre (Ganada/Perdida), derivamos el estado y
   // la fecha real de cierre automáticamente, tal como exige la consigna.
   const camposDerivados: Prisma.OportunidadUncheckedUpdateInput = {};
+  let observacionHistorial = params.observacion;
+
   if (etapaNueva.tipo === "GANADA") {
     camposDerivados.estado = "GANADA";
     camposDerivados.fechaRealCierre = new Date();
@@ -157,6 +159,9 @@ export async function cambiarEtapa(params: {
     camposDerivados.estado = "PERDIDA";
     camposDerivados.fechaRealCierre = new Date();
     camposDerivados.motivoPerdida = params.motivoPerdida;
+    observacionHistorial = [params.observacion, `Motivo de pérdida: ${params.motivoPerdida}`]
+      .filter(Boolean)
+      .join(" — ");
   }
 
   const empresaIdToClear = etapaNueva.tipo !== "ABIERTA" ? oportunidad.empresaId : null;
@@ -172,7 +177,7 @@ export async function cambiarEtapa(params: {
     etapaAnteriorId: oportunidad.etapaId,
     etapaNuevaId: params.etapaNuevaId,
     usuarioId: params.usuarioId,
-    observacion: params.observacion,
+    observacion: observacionHistorial,
     camposDerivados,
     camposActualizacion: params.camposActualizacion,
     empresaIdToClear,
