@@ -50,6 +50,7 @@ const cambiarEtapaSchema = z.object({
   etapaNuevaId: z.number().int(),
   observacion: z.string().optional(),
   motivoPerdida: z.string().optional(),
+  motivoBaja: z.string().optional(),
 });
 
 oportunidadesRouter.post(

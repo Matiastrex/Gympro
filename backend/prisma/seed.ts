@@ -27,6 +27,7 @@ async function main() {
     { nombre: "Negociación", orden: 5, tipo: "ABIERTA" as const },
     { nombre: "Inscripto", orden: 6, tipo: "GANADA" as const },
     { nombre: "Perdida", orden: 7, tipo: "PERDIDA" as const },
+    { nombre: "Baja", orden: 8, tipo: "BAJA" as const },
   ];
 
   for (const etapa of etapas) {
@@ -35,6 +36,13 @@ async function main() {
       await prisma.etapa.create({ data: etapa });
     }
   }
+
+  // Backfill: las etapas de clase de prueba pueden haber sido sembradas antes
+  // de que existiera este campo, así que se marcan siempre (idempotente).
+  await prisma.etapa.updateMany({
+    where: { nombre: { in: ["Clase de prueba agendada", "Clase de prueba realizada"] } },
+    data: { esClasePrueba: true },
+  });
 
   // ---------- Productos: planes de membresía del gimnasio ----------
   // (No son los planes SaaS "Básico/Profesional" de GymPro; son lo que EL

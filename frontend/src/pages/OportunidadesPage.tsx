@@ -155,6 +155,11 @@ export function OportunidadesPage() {
   const formActivo = mostrarForm || editando !== null;
   const etapaSeleccionada = etapas.find((et) => et.id === Number(form.etapaId));
   const mostrarMotivoPerdida = editando !== null && etapaSeleccionada?.tipo == "PERDIDA";
+  // "Baja" solo es una opción válida si la oportunidad que se está editando está
+  // actualmente en Inscripto (tipo GANADA); en creación, o editando cualquier
+  // otra etapa, no se debe poder elegir Baja directamente desde este formulario.
+  const etapaActualTipo = editando ? etapas.find((et) => et.id === editando.etapaId)?.tipo : undefined;
+  const etapasSeleccionables = etapas.filter((et) => et.tipo !== "BAJA" || etapaActualTipo === "GANADA");
 
   return (
     <div className="container">
@@ -250,9 +255,9 @@ export function OportunidadesPage() {
                   }}
                 >
                   <option value="">Elegir...</option>
-                  {etapas.map((et) => (
+                  {etapasSeleccionables.map((et) => (
                     <option key={et.id} value={et.id}>
-                      {et.nombre} 
+                      {et.nombre}
                     </option>
                   ))}
                 </select>

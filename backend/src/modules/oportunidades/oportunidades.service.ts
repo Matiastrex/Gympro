@@ -44,6 +44,12 @@ export async function crear(data: OportunidadInput, usuarioId: number) {
 
   const etapa = await oportunidadesRepo.findEtapaTipo(data.etapaId);
   if (!etapa) throw ApiError.notFound("Etapa no encontrada");
+  if (etapa.tipo === "BAJA") {
+    // No existe una "etapa anterior" para una oportunidad recién creada, así
+    // que Baja nunca es un destino válido en la creación: solo se llega ahí
+    // moviendo una oportunidad que ya estaba en Inscripto (ver cambiarEtapa).
+    throw ApiError.badRequest("No se puede crear una oportunidad directamente en la etapa Baja");
+  }
   if (etapa.tipo === "PERDIDA" && !data.motivoPerdida) {
     throw ApiError.badRequest("Hay que indicar un motivo para cerrar la oportunidad");
   }
@@ -59,6 +65,11 @@ export async function crear(data: OportunidadInput, usuarioId: number) {
     if (contacto?.empresaId != null) {
       throw ApiError.badRequest("El contacto tiene convenio corporativo");
     }
+    if (etapa.esClasePrueba && contacto?.bajaDefinitiva) {
+      throw ApiError.badRequest(
+        "El contacto fue dado de baja anteriormente y no puede volver a agendar ni realizar una clase de prueba"
+      );
+    }
   }
 
   if (data.empresaId != null) {
@@ -68,6 +79,11 @@ export async function crear(data: OportunidadInput, usuarioId: number) {
     }
     if (empresa?.oportunidadAbiertaId != null) {
       throw ApiError.badRequest("La empresa ya tiene una oportunidad abierta");
+    }
+    if (etapa.esClasePrueba && empresa?.bajaDefinitiva) {
+      throw ApiError.badRequest(
+        "La empresa fue dada de baja anteriormente y no puede volver a agendar ni realizar una clase de prueba"
+      );
     }
   }
 
@@ -130,25 +146,55 @@ export async function cambiarEtapa(params: {
   usuarioId: number;
   observacion?: string;
   motivoPerdida?: string;
+  motivoBaja?: string;
   camposActualizacion?: Prisma.OportunidadUncheckedUpdateInput;
 }) {
   const oportunidad = await obtener(params.oportunidadId);
 
-  if (oportunidad.estado !== "ABIERTA") {
+  const etapaNueva = await prisma.etapa.findUnique({ where: { id: params.etapaNuevaId } });
+  if (!etapaNueva) throw ApiError.notFound("Etapa no encontrada");
+
+  // Regla de negocio: a Baja solo se puede llegar desde Inscripto (la única
+  // etapa GANADA), sin importar cuántas etapas GANADA/PERDIDA distintas haya
+  // en el futuro. Este chequeo va ANTES del guard de "ya está cerrada": si no,
+  // una oportunidad todavía ABIERTA pasaría de largo ese guard y saltaría
+  // directo a Baja sin pasar por Inscripto.
+  if (etapaNueva.tipo === "BAJA" && oportunidad.etapa.tipo !== "GANADA") {
+    throw ApiError.badRequest("Solo se puede dar de baja una oportunidad que está en Inscripto");
+  }
+
+  const entrandoABaja = etapaNueva.tipo === "BAJA" && oportunidad.etapa.tipo === "GANADA";
+  // Baja es la única etapa cerrada desde la que se permite reabrir: un socio
+  // dado de baja puede volver a consultar/negociar/inscribirse (nunca a una
+  // clase de prueba, bloqueado más abajo por el chequeo de esClasePrueba).
+  const saliendoDeBaja = oportunidad.etapa.tipo === "BAJA" && etapaNueva.tipo !== "BAJA";
+  if (oportunidad.estado !== "ABIERTA" && !entrandoABaja && !saliendoDeBaja) {
     // Regla de negocio (Módulo 2): una oportunidad cerrada no puede volver a
     // moverse de etapa sin un flujo de autorización, que es parte de la
-    // Entrega Final. Por ahora directamente lo bloqueamos.
+    // Entrega Final. Por ahora directamente lo bloqueamos (salvo los pasajes
+    // Inscripto -> Baja y Baja -> cualquier otra etapa).
     throw ApiError.badRequest("La oportunidad ya está cerrada, no puede cambiar de etapa");
   }
 
-  const etapaNueva = await prisma.etapa.findUnique({ where: { id: params.etapaNuevaId } });
-  if (!etapaNueva) throw ApiError.notFound("Etapa no encontrada");
   if (etapaNueva.tipo == "PERDIDA" && !params.motivoPerdida) {
     throw ApiError.badRequest("Hay que indicar un motivo para cerrar la oportunidad");
   }
 
-  // Si la nueva etapa es de cierre (Ganada/Perdida), derivamos el estado y
-  // la fecha real de cierre automáticamente, tal como exige la consigna.
+  if (etapaNueva.esClasePrueba) {
+    if (oportunidad.contacto?.bajaDefinitiva) {
+      throw ApiError.badRequest(
+        "El contacto fue dado de baja anteriormente y no puede volver a agendar ni realizar una clase de prueba"
+      );
+    }
+    if (oportunidad.empresa?.bajaDefinitiva) {
+      throw ApiError.badRequest(
+        "La empresa fue dada de baja anteriormente y no puede volver a agendar ni realizar una clase de prueba"
+      );
+    }
+  }
+
+  // Si la nueva etapa es de cierre (Ganada/Perdida/Baja), derivamos el estado
+  // y la fecha real de cierre automáticamente, tal como exige la consigna.
   const camposDerivados: Prisma.OportunidadUncheckedUpdateInput = {};
   if (etapaNueva.tipo === "GANADA") {
     camposDerivados.estado = "GANADA";
@@ -157,15 +203,37 @@ export async function cambiarEtapa(params: {
     camposDerivados.estado = "PERDIDA";
     camposDerivados.fechaRealCierre = new Date();
     camposDerivados.motivoPerdida = params.motivoPerdida;
+  } else if (etapaNueva.tipo === "BAJA") {
+    camposDerivados.estado = "BAJA";
+    // fechaRealCierre ya quedó fijada cuando la oportunidad llegó a Inscripto
+    // (fecha en que se ganó la venta) y no debe reescribirse acá: la baja es
+    // un evento distinto, con su propia fecha.
+    camposDerivados.fechaBaja = new Date();
+    camposDerivados.motivoBaja = params.motivoBaja ?? null;
+  } else {
+    // ABIERTA: sin esto, reabrir desde Baja dejaría el estado en "BAJA" para
+    // siempre (los movimientos normales abierta->abierta ya tenían estado
+    // "ABIERTA", así que esto es un no-op para ellos).
+    camposDerivados.estado = "ABIERTA";
   }
+
+  // Al reabrir desde Baja hacia una etapa abierta, el contacto/empresa vuelve
+  // a tener una oportunidad en curso: hay que restaurar oportunidadAbiertaId
+  // (se había limpiado al entrar a Baja), o el sistema dejaría crear una
+  // segunda oportunidad abierta en paralelo para la misma persona/empresa.
+  const reabriendo = saliendoDeBaja && etapaNueva.tipo === "ABIERTA";
 
   const empresaIdToClear = etapaNueva.tipo !== "ABIERTA" ? oportunidad.empresaId : null;
   const contactoIdToClear = etapaNueva.tipo !== "ABIERTA" ? oportunidad.contactoId : null;
+  const empresaIdToRestore = reabriendo ? oportunidad.empresaId : null;
+  const contactoIdToRestore = reabriendo ? oportunidad.contactoId : null;
   const estadoEntidad = etapaNueva.tipo === "GANADA"
     ? "CLIENTE"
     : etapaNueva.tipo === "PERDIDA"
       ? "INACTIVO"
-      : "POTENCIAL";
+      : etapaNueva.tipo === "BAJA"
+        ? "INACTIVO"
+        : "POTENCIAL";
 
   return oportunidadesRepo.cambiarEtapa({
     oportunidadId: params.oportunidadId,
@@ -177,8 +245,11 @@ export async function cambiarEtapa(params: {
     camposActualizacion: params.camposActualizacion,
     empresaIdToClear,
     contactoIdToClear,
+    empresaIdToRestore,
+    contactoIdToRestore,
     empresaIdToUpdate: oportunidad.empresaId,
     contactoIdToUpdate: oportunidad.contactoId,
     estadoEntidad,
+    marcarBajaDefinitiva: etapaNueva.tipo === "BAJA",
   });
 }

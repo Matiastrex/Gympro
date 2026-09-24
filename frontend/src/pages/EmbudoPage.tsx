@@ -9,7 +9,7 @@ interface Etapa {
   id: number;
   nombre: string;
   orden: number;
-  tipo: "ABIERTA" | "GANADA" | "PERDIDA";
+  tipo: "ABIERTA" | "GANADA" | "PERDIDA" | "BAJA";
 }
 
 interface Oportunidad {
@@ -20,6 +20,7 @@ interface Oportunidad {
   probabilidadCierre?: number | null;
   fechaEstimadaCierre?: string | null;
   fechaRealCierre?: string | null;
+  fechaBaja?: string | null;
   etapaId: number;
   contacto?: { nombre: string; apellido: string } | null;
   empresa?: { razonSocial: string } | null;
@@ -44,6 +45,8 @@ export function EmbudoPage() {
   const [detalle, setDetalle] = useState<OportunidadDetalle | null>(null);
   const [perdida, setPerdida] = useState<{ oportunidadId: number; etapaNuevaId: number } | null>(null);
   const [motivo, setMotivo] = useState("");
+  const [baja, setBaja] = useState<{ oportunidadId: number; etapaNuevaId: number } | null>(null);
+  const [motivoBaja, setMotivoBaja] = useState("");
   const [draggedOportunidadId, setDraggedOportunidadId] = useState<number | null>(null);
   const [dragOverColumnaId, setDragOverColumnaId] = useState<number | null>(null);
 
@@ -58,10 +61,14 @@ export function EmbudoPage() {
 
   const totalEtapas = columnas.length || 1;
 
-  async function moverEtapa(oportunidadId: number, etapaNuevaId: number, motivoPerdida?: string) {
+  async function moverEtapa(oportunidadId: number, etapaNuevaId: number, motivoPerdida?: string, motivoBajaParam?: string) {
     setError(null);
     try {
-      await api.post(`/oportunidades/${oportunidadId}/cambiar-etapa`, { etapaNuevaId, motivoPerdida });
+      await api.post(`/oportunidades/${oportunidadId}/cambiar-etapa`, {
+        etapaNuevaId,
+        motivoPerdida,
+        motivoBaja: motivoBajaParam,
+      });
       await cargar();
     } catch (err: any) {
       setError(err.response?.data?.error ?? "No se pudo cambiar de etapa");
@@ -74,6 +81,11 @@ export function EmbudoPage() {
       setPerdida({ oportunidadId, etapaNuevaId });
       return;
     }
+    if (etapaTipo === "BAJA") {
+      setMotivoBaja("");
+      setBaja({ oportunidadId, etapaNuevaId });
+      return;
+    }
     moverEtapa(oportunidadId, etapaNuevaId);
   }
 
@@ -82,6 +94,13 @@ export function EmbudoPage() {
     if (!perdida) return;
     await moverEtapa(perdida.oportunidadId, perdida.etapaNuevaId, motivo);
     setPerdida(null);
+  }
+
+  async function confirmarBaja(e: FormEvent) {
+    e.preventDefault();
+    if (!baja) return;
+    await moverEtapa(baja.oportunidadId, baja.etapaNuevaId, undefined, motivoBaja || undefined);
+    setBaja(null);
   }
 
   async function abrirDetalle(id: number) {
@@ -129,6 +148,11 @@ export function EmbudoPage() {
       return;
     }
 
+    if (etapaDestino.tipo === "BAJA" && columnaOrigen?.etapa.tipo !== "GANADA") {
+      setError("Solo se puede dar de baja una oportunidad que está en Inscripto");
+      return;
+    }
+
     handleMover(oportunidadId, etapaDestino.id, etapaDestino.tipo);
   }
 
@@ -146,7 +170,8 @@ export function EmbudoPage() {
       <div className="board">
         {columnas.map(({ etapa, oportunidades }) => {
           const progresoEtapa = Math.round((etapa.orden / totalEtapas) * 100);
-          const cerradaClass = etapa.tipo === "GANADA" ? "is-won" : etapa.tipo === "PERDIDA" ? "is-lost" : "";
+          const cerradaClass =
+            etapa.tipo === "GANADA" ? "is-won" : etapa.tipo === "PERDIDA" ? "is-lost" : etapa.tipo === "BAJA" ? "is-baja" : "";
           const isDragOver = dragOverColumnaId === etapa.id;
 
           return (
@@ -166,8 +191,12 @@ export function EmbudoPage() {
                 {oportunidades.map((o) => {
                   const abierta = etapa.tipo === "ABIERTA";
                   const probabilidad =
-                    etapa.tipo === "GANADA" ? 100 : etapa.tipo === "PERDIDA" ? o.probabilidadCierre ?? 0 : o.probabilidadCierre ?? progresoEtapa;
-                  const fechaFoco = abierta ? o.fechaEstimadaCierre : o.fechaRealCierre;
+                    etapa.tipo === "GANADA"
+                      ? 100
+                      : etapa.tipo === "PERDIDA" || etapa.tipo === "BAJA"
+                        ? o.probabilidadCierre ?? 0
+                        : o.probabilidadCierre ?? progresoEtapa;
+                  const fechaFoco = abierta ? o.fechaEstimadaCierre : etapa.tipo === "BAJA" ? o.fechaBaja : o.fechaRealCierre;
                   const fechaLabel = fechaFoco
                     ? new Date(fechaFoco).toLocaleDateString("es-AR", { day: "2-digit", month: "short" })
                     : abierta
@@ -207,7 +236,7 @@ export function EmbudoPage() {
                           >
                             <option value="">Mover a...</option>
                             {columnas
-                              .filter((c) => c.etapa.id !== etapa.id)
+                              .filter((c) => c.etapa.id !== etapa.id && c.etapa.tipo !== "BAJA")
                               .map((c) => (
                                 <option key={c.etapa.id} value={`${c.etapa.id}|${c.etapa.tipo}`}>
                                   {c.etapa.nombre}
@@ -261,6 +290,27 @@ export function EmbudoPage() {
               </button>
               <button type="submit" className="btn danger">
                 Marcar como perdida
+              </button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {baja && (
+        <Modal title="Dar de baja" onClose={() => setBaja(null)} width={420}>
+          <form onSubmit={confirmarBaja}>
+            <div className="form-grid">
+              <label className="span-2">
+                Motivo de la baja (opcional)
+                <textarea value={motivoBaja} onChange={(e) => setMotivoBaja(e.target.value)} autoFocus />
+              </label>
+            </div>
+            <div className="modal-actions">
+              <button type="button" className="btn secondary" onClick={() => setBaja(null)}>
+                Cancelar
+              </button>
+              <button type="submit" className="btn danger">
+                Dar de baja
               </button>
             </div>
           </form>

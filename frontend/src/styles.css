@@ -468,6 +468,7 @@ textarea { resize: vertical; min-height: 70px; font-family: inherit; }
 .board-column-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--brand); flex: 0 0 auto; }
 .board-column-dot.is-won { background: var(--success); }
 .board-column-dot.is-lost { background: var(--danger); }
+.board-column-dot.is-baja { background: var(--warning); }
 
 .board-column-header h3 { font-size: 13.5px; font-weight: 700; color: var(--ink); flex: 1; }
 .board-column-header .count {
@@ -531,6 +532,7 @@ textarea { resize: vertical; min-height: 70px; font-family: inherit; }
 .opp-card-progress > span { display: block; height: 100%; background: var(--brand); border-radius: var(--radius-pill); }
 .opp-card-progress.is-won > span { background: var(--success); }
 .opp-card-progress.is-lost > span { background: var(--danger); }
+.opp-card-progress.is-baja > span { background: var(--warning); }
 
 .opp-card-footer { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 
@@ -545,6 +547,7 @@ textarea { resize: vertical; min-height: 70px; font-family: inherit; }
 }
 .opp-card-date.is-won { background: var(--success-wash); color: var(--success); }
 .opp-card-date.is-lost { background: var(--danger-wash); color: var(--danger); }
+.opp-card-date.is-baja { background: var(--warning-wash); color: var(--warning); }
 .opp-card-date.is-unset { background: var(--neutral-wash); color: var(--ink-faint); }
 
 .opp-card-value { font-size: 13px; font-weight: 600; color: var(--ink); display: flex; align-items: center; gap: 8px; }

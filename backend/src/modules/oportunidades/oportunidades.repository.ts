@@ -2,8 +2,8 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "../../config/db";
 
 const includeCompleto = {
-  empresa: { select: { id: true, razonSocial: true } },
-  contacto: { select: { id: true, nombre: true, apellido: true } },
+  empresa: { select: { id: true, razonSocial: true, bajaDefinitiva: true } },
+  contacto: { select: { id: true, nombre: true, apellido: true, bajaDefinitiva: true } },
   responsable: { select: { id: true, nombre: true, apellido: true } },
   producto: { select: { id: true, nombre: true } },
   etapa: true,
@@ -94,20 +94,20 @@ export function findHistorial(oportunidadId: number) {
 }
 
 export function findEtapaTipo(id: number) {
-  return prisma.etapa.findUnique({ where: { id }, select: { tipo: true } });
+  return prisma.etapa.findUnique({ where: { id }, select: { tipo: true, esClasePrueba: true } });
 }
 
 export function findContactoParaCrear(id: number) {
   return prisma.contacto.findUnique({
     where: { id },
-    select: { estado: true, oportunidadAbiertaId: true, empresaId: true },
+    select: { estado: true, oportunidadAbiertaId: true, empresaId: true, bajaDefinitiva: true },
   });
 }
 
 export function findEmpresaParaCrear(id: number) {
   return prisma.empresa.findUnique({
     where: { id },
-    select: { estado: true, oportunidadAbiertaId: true },
+    select: { estado: true, oportunidadAbiertaId: true, bajaDefinitiva: true },
   });
 }
 
@@ -144,9 +144,12 @@ export function cambiarEtapa(params: {
   camposActualizacion?: Prisma.OportunidadUncheckedUpdateInput;
   empresaIdToClear?: number | null;
   contactoIdToClear?: number | null;
+  empresaIdToRestore?: number | null;
+  contactoIdToRestore?: number | null;
   empresaIdToUpdate?: number | null;
   contactoIdToUpdate?: number | null;
   estadoEntidad?: "CLIENTE" | "INACTIVO" | "POTENCIAL";
+  marcarBajaDefinitiva?: boolean;
 }) {
   const {
     oportunidadId,
@@ -158,9 +161,12 @@ export function cambiarEtapa(params: {
     camposActualizacion,
     empresaIdToClear,
     contactoIdToClear,
+    empresaIdToRestore,
+    contactoIdToRestore,
     empresaIdToUpdate,
     contactoIdToUpdate,
     estadoEntidad,
+    marcarBajaDefinitiva,
   } = params;
 
   return prisma.$transaction(async (tx) => {
@@ -176,12 +182,19 @@ export function cambiarEtapa(params: {
         data: {
           estado: estadoEntidad,
           ...(empresaIdToClear != null ? { oportunidadAbiertaId: null } : {}),
+          ...(empresaIdToRestore != null ? { oportunidadAbiertaId: oportunidadId } : {}),
+          ...(marcarBajaDefinitiva ? { bajaDefinitiva: true } : {}),
         },
       });
 
+      // Si la empresa (convenio corporativo) se da de baja, todos sus
+      // contactos quedan dados de baja también, no solo la empresa.
       await tx.contacto.updateMany({
         where: { empresaId: empresaIdToUpdate },
-        data: { estado: estadoEntidad },
+        data: {
+          estado: estadoEntidad,
+          ...(marcarBajaDefinitiva ? { bajaDefinitiva: true } : {}),
+        },
       });
     }
 
@@ -191,6 +204,8 @@ export function cambiarEtapa(params: {
         data: {
           estado: estadoEntidad,
           ...(contactoIdToClear != null ? { oportunidadAbiertaId: null } : {}),
+          ...(contactoIdToRestore != null ? { oportunidadAbiertaId: oportunidadId } : {}),
+          ...(marcarBajaDefinitiva ? { bajaDefinitiva: true } : {}),
         },
       });
     }

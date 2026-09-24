@@ -31,12 +31,14 @@ enum TipoEtapa {
   ABIERTA
   GANADA
   PERDIDA
+  BAJA
 }
 
 enum EstadoOportunidad {
   ABIERTA
   GANADA
   PERDIDA
+  BAJA
 }
 
 // ---------- Usuarios (roles completos ya modelados; el MVP usa 1 solo rol) ----------
@@ -74,6 +76,7 @@ model Empresa {
   direccion     String?
   sitioWeb      String?
   estado        EstadoEntidad @default(POTENCIAL)
+  bajaDefinitiva Boolean      @default(false)
   origen        String?
   observaciones String?       @db.Text
 
@@ -99,6 +102,7 @@ model Contacto {
   email         String?
   telefono      String?
   estado        EstadoEntidad @default(POTENCIAL)
+  bajaDefinitiva Boolean      @default(false)
   origen        String?
   observaciones String?       @db.Text
 
@@ -138,10 +142,11 @@ model Producto {
 // UI queda para la Entrega Final (Módulo de administración).
 
 model Etapa {
-  id     Int       @id @default(autoincrement())
-  nombre String
-  orden  Int
-  tipo   TipoEtapa @default(ABIERTA)
+  id            Int       @id @default(autoincrement())
+  nombre        String
+  orden         Int
+  tipo          TipoEtapa @default(ABIERTA)
+  esClasePrueba Boolean   @default(false)
 
   oportunidades   Oportunidad[]
   historialComoAnterior HistorialEtapa[] @relation("EtapaAnterior")
@@ -175,9 +180,11 @@ model Oportunidad {
   probabilidadCierre  Int?
   fechaEstimadaCierre DateTime?
   fechaRealCierre     DateTime?
+  fechaBaja           DateTime?
   origen              String?
   estado              EstadoOportunidad  @default(ABIERTA)
   motivoPerdida       String?
+  motivoBaja          String?
   observaciones       String?            @db.Text
 
   actividades     Actividad[]

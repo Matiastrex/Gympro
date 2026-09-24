@@ -8,6 +8,7 @@ const VARIANT_BY_VALUE: Record<string, string> = {
   ABIERTA: "badge-info",
   GANADA: "badge-success",
   PERDIDA: "badge-danger",
+  BAJA: "badge-warning",
 };
 
 export const ESTADO_LABEL: Record<string, string> = {
@@ -18,6 +19,7 @@ export const ESTADO_LABEL: Record<string, string> = {
   ABIERTA: "Abierta",
   GANADA: "Ganada",
   PERDIDA: "Perdida",
+  BAJA: "Baja",
 };
 
 interface BadgeProps {
