@@ -213,6 +213,9 @@ export async function cambiarEtapa(params: {
     // un evento distinto, con su propia fecha.
     camposDerivados.fechaBaja = new Date();
     camposDerivados.motivoBaja = params.motivoBaja ?? null;
+    observacionHistorial = [params.observacion, params.motivoBaja && `Motivo de baja: ${params.motivoBaja}`]
+      .filter(Boolean)
+      .join(" — ") || undefined;
   }
 
   const empresaIdToClear = etapaNueva.tipo !== "ABIERTA" ? oportunidad.empresaId : null;
