@@ -144,8 +144,6 @@ export function cambiarEtapa(params: {
   camposActualizacion?: Prisma.OportunidadUncheckedUpdateInput;
   empresaIdToClear?: number | null;
   contactoIdToClear?: number | null;
-  empresaIdToRestore?: number | null;
-  contactoIdToRestore?: number | null;
   empresaIdToUpdate?: number | null;
   contactoIdToUpdate?: number | null;
   estadoEntidad?: "CLIENTE" | "INACTIVO" | "POTENCIAL";
@@ -161,8 +159,6 @@ export function cambiarEtapa(params: {
     camposActualizacion,
     empresaIdToClear,
     contactoIdToClear,
-    empresaIdToRestore,
-    contactoIdToRestore,
     empresaIdToUpdate,
     contactoIdToUpdate,
     estadoEntidad,
@@ -182,7 +178,6 @@ export function cambiarEtapa(params: {
         data: {
           estado: estadoEntidad,
           ...(empresaIdToClear != null ? { oportunidadAbiertaId: null } : {}),
-          ...(empresaIdToRestore != null ? { oportunidadAbiertaId: oportunidadId } : {}),
           ...(marcarBajaDefinitiva ? { bajaDefinitiva: true } : {}),
         },
       });
@@ -204,7 +199,6 @@ export function cambiarEtapa(params: {
         data: {
           estado: estadoEntidad,
           ...(contactoIdToClear != null ? { oportunidadAbiertaId: null } : {}),
-          ...(contactoIdToRestore != null ? { oportunidadAbiertaId: oportunidadId } : {}),
           ...(marcarBajaDefinitiva ? { bajaDefinitiva: true } : {}),
         },
       });

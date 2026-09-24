@@ -163,16 +163,14 @@ export async function cambiarEtapa(params: {
     throw ApiError.badRequest("Solo se puede dar de baja una oportunidad que está en Inscripto");
   }
 
-  const entrandoABaja = etapaNueva.tipo === "BAJA" && oportunidad.etapa.tipo === "GANADA";
-  // Baja es la única etapa cerrada desde la que se permite reabrir: un socio
-  // dado de baja puede volver a consultar/negociar/inscribirse (nunca a una
-  // clase de prueba, bloqueado más abajo por el chequeo de esClasePrueba).
-  const saliendoDeBaja = oportunidad.etapa.tipo === "BAJA" && etapaNueva.tipo !== "BAJA";
-  if (oportunidad.estado !== "ABIERTA" && !entrandoABaja && !saliendoDeBaja) {
+  const esBajaDesdeInscripto = etapaNueva.tipo === "BAJA" && oportunidad.etapa.tipo === "GANADA";
+  if (oportunidad.estado !== "ABIERTA" && !esBajaDesdeInscripto) {
     // Regla de negocio (Módulo 2): una oportunidad cerrada no puede volver a
     // moverse de etapa sin un flujo de autorización, que es parte de la
-    // Entrega Final. Por ahora directamente lo bloqueamos (salvo los pasajes
-    // Inscripto -> Baja y Baja -> cualquier otra etapa).
+    // Entrega Final. Por ahora directamente lo bloqueamos (salvo el pasaje
+    // Inscripto -> Baja, que es la única transición permitida post-cierre).
+    // Baja, igual que Ganada/Perdida, es un estado terminal e irreversible:
+    // una vez ahí, no hay vuelta atrás.
     throw ApiError.badRequest("La oportunidad ya está cerrada, no puede cambiar de etapa");
   }
 
@@ -210,23 +208,10 @@ export async function cambiarEtapa(params: {
     // un evento distinto, con su propia fecha.
     camposDerivados.fechaBaja = new Date();
     camposDerivados.motivoBaja = params.motivoBaja ?? null;
-  } else {
-    // ABIERTA: sin esto, reabrir desde Baja dejaría el estado en "BAJA" para
-    // siempre (los movimientos normales abierta->abierta ya tenían estado
-    // "ABIERTA", así que esto es un no-op para ellos).
-    camposDerivados.estado = "ABIERTA";
   }
-
-  // Al reabrir desde Baja hacia una etapa abierta, el contacto/empresa vuelve
-  // a tener una oportunidad en curso: hay que restaurar oportunidadAbiertaId
-  // (se había limpiado al entrar a Baja), o el sistema dejaría crear una
-  // segunda oportunidad abierta en paralelo para la misma persona/empresa.
-  const reabriendo = saliendoDeBaja && etapaNueva.tipo === "ABIERTA";
 
   const empresaIdToClear = etapaNueva.tipo !== "ABIERTA" ? oportunidad.empresaId : null;
   const contactoIdToClear = etapaNueva.tipo !== "ABIERTA" ? oportunidad.contactoId : null;
-  const empresaIdToRestore = reabriendo ? oportunidad.empresaId : null;
-  const contactoIdToRestore = reabriendo ? oportunidad.contactoId : null;
   const estadoEntidad = etapaNueva.tipo === "GANADA"
     ? "CLIENTE"
     : etapaNueva.tipo === "PERDIDA"
@@ -245,8 +230,6 @@ export async function cambiarEtapa(params: {
     camposActualizacion: params.camposActualizacion,
     empresaIdToClear,
     contactoIdToClear,
-    empresaIdToRestore,
-    contactoIdToRestore,
     empresaIdToUpdate: oportunidad.empresaId,
     contactoIdToUpdate: oportunidad.contactoId,
     estadoEntidad,
