@@ -26,7 +26,11 @@ export function findById(id: number) {
     include: {
       ...includeCompleto,
       historialEtapas: {
-        include: { etapaNueva: true, usuario: { select: { nombre: true, apellido: true } } },
+        include: {
+          etapaAnterior: true,
+          etapaNueva: true,
+          usuario: { select: { nombre: true, apellido: true } },
+        },
         orderBy: { fecha: "desc" },
       },
       actividades: { orderBy: { fecha: "desc" } },
@@ -36,7 +40,8 @@ export function findById(id: number) {
 
 export function create(
   data: Prisma.OportunidadCreateInput,
-  estadoEntidad: "CLIENTE" | "INACTIVO" | "POTENCIAL"
+  estadoEntidad: "CLIENTE" | "INACTIVO" | "POTENCIAL",
+  usuarioId: number
 ) {
   return prisma.$transaction(async (tx) => {
     const oportunidad = await tx.oportunidad.create({ data, include: includeCompleto });
@@ -62,7 +67,29 @@ export function create(
       });
     }
 
+    await tx.historialEtapa.create({
+      data: {
+        oportunidadId: oportunidad.id,
+        etapaAnteriorId: null,
+        etapaNuevaId: oportunidad.etapaId,
+        usuarioId,
+        observacion: "Oportunidad creada",
+      },
+    });
+
     return oportunidad;
+  });
+}
+
+export function findHistorial(oportunidadId: number) {
+  return prisma.historialEtapa.findMany({
+    where: { oportunidadId },
+    include: {
+      etapaAnterior: true,
+      etapaNueva: true,
+      usuario: { select: { id: true, nombre: true, apellido: true } },
+    },
+    orderBy: [{ fecha: "desc" }, { id: "desc" }],
   });
 }
 

@@ -399,6 +399,34 @@ textarea { resize: vertical; min-height: 70px; font-family: inherit; }
   font-size: 13.5px;
 }
 
+.stage-history { display: flex; flex-direction: column; gap: 0; }
+.stage-history-item { display: flex; gap: 12px; position: relative; min-height: 70px; }
+.stage-history-item:not(:last-child)::before {
+  content: "";
+  position: absolute;
+  left: 5px;
+  top: 14px;
+  bottom: 0;
+  width: 1px;
+  background: var(--line);
+}
+.stage-history-marker {
+  width: 11px;
+  height: 11px;
+  flex: 0 0 11px;
+  margin-top: 4px;
+  border: 2px solid var(--brand);
+  border-radius: 50%;
+  background: var(--surface);
+  z-index: 1;
+}
+.stage-history-content { min-width: 0; flex: 1; padding-bottom: 17px; }
+.stage-history-heading { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; }
+.stage-history-heading strong { font-size: 13.5px; color: var(--ink); }
+.stage-history-heading time { color: var(--ink-faint); font-size: 11.5px; white-space: nowrap; }
+.stage-history-user { display: block; color: var(--ink-soft); font-size: 12px; margin-top: 3px; }
+.stage-history-content p { color: var(--ink-soft); font-size: 12.5px; margin: 7px 0 0; }
+
 /* ---------- Kanban board ---------- */
 
 .board {

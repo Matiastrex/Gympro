@@ -27,7 +27,14 @@ oportunidadesRouter.post(
   "/",
   asyncHandler(async (req, res) => {
     const data = oportunidadesService.oportunidadSchema.parse(req.body);
-    res.status(201).json(await oportunidadesService.crear(data));
+    res.status(201).json(await oportunidadesService.crear(data, req.user!.userId));
+  })
+);
+
+oportunidadesRouter.get(
+  "/:id/historial",
+  asyncHandler(async (req, res) => {
+    res.json(await oportunidadesService.historial(Number(req.params.id)));
   })
 );
 

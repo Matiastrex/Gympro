@@ -144,6 +144,7 @@ model Etapa {
   tipo   TipoEtapa @default(ABIERTA)
 
   oportunidades   Oportunidad[]
+  historialComoAnterior HistorialEtapa[] @relation("EtapaAnterior")
   historialComoNueva HistorialEtapa[] @relation("EtapaNueva")
 
   @@map("etapas")
@@ -217,6 +218,7 @@ model HistorialEtapa {
   oportunidad   Oportunidad @relation(fields: [oportunidadId], references: [id])
 
   etapaAnteriorId Int?
+  etapaAnterior   Etapa? @relation("EtapaAnterior", fields: [etapaAnteriorId], references: [id])
   etapaNuevaId    Int
   etapaNueva      Etapa @relation("EtapaNueva", fields: [etapaNuevaId], references: [id])
 
