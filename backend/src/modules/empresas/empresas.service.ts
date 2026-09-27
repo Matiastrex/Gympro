@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { ApiError } from "../../utils/apiError";
 import * as empresasRepo from "./empresas.repository";
+import * as oportunidadesService from "../oportunidades/oportunidades.service";
 
 export const empresaSchema = z.object({
   razonSocial: z.string().min(1, "La razón social es obligatoria"),
@@ -17,6 +18,11 @@ export const empresaSchema = z.object({
 });
 
 export type EmpresaInput = z.infer<typeof empresaSchema>;
+
+export const bajaSchema = z.object({
+  contactarNuevamente: z.boolean(),
+  motivoBaja: z.string().optional(),
+});
 
 export function listar(filtro?: string) {
   return empresasRepo.findAll(filtro);
@@ -37,7 +43,31 @@ export async function actualizar(id: number, data: EmpresaInput) {
   return empresasRepo.update(id, data as any);
 }
 
-export async function darDeBaja(id: number) {
-  await obtener(id);
-  return empresasRepo.darDeBaja(id);
+export async function darDeBaja(
+  id: number,
+  contactarNuevamente: boolean,
+  usuarioId: number,
+  motivoBaja?: string
+) {
+  const empresa = await obtener(id);
+  if (empresa.oportunidadAbiertaId != null) {
+    throw ApiError.badRequest("No se puede dar de baja una empresa con una oportunidad abierta");
+  }
+  const estado = contactarNuevamente ? "INACTIVO" : "NO_CONTACTAR";
+
+  // Si el convenio está inscripto, darlo de baja es cancelar su inscripción.
+  const inscripcion = empresa.estado === "CLIENTE"
+    ? empresa.oportunidades.find((o) => o.estado === "GANADA")
+    : undefined;
+  if (inscripcion) {
+    await oportunidadesService.cancelarInscripcion({
+      oportunidadId: inscripcion.id,
+      usuarioId,
+      motivoBaja,
+      estadoEntidad: estado,
+    });
+    return obtener(id);
+  }
+
+  return empresasRepo.darDeBaja(id, estado);
 }

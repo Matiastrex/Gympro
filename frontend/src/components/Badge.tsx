@@ -19,7 +19,7 @@ export const ESTADO_LABEL: Record<string, string> = {
   ABIERTA: "Abierta",
   GANADA: "Ganada",
   PERDIDA: "Perdida",
-  BAJA: "Baja",
+  BAJA: "Inscripción cancelada",
 };
 
 interface BadgeProps {

@@ -93,6 +93,10 @@ export function findHistorial(oportunidadId: number) {
   });
 }
 
+export function findEtapaPorTipo(tipo: "BAJA") {
+  return prisma.etapa.findFirst({ where: { tipo }, orderBy: { orden: "asc" } });
+}
+
 export function findEtapaTipo(id: number) {
   return prisma.etapa.findUnique({ where: { id }, select: { tipo: true, esClasePrueba: true } });
 }
@@ -146,7 +150,7 @@ export function cambiarEtapa(params: {
   contactoIdToClear?: number | null;
   empresaIdToUpdate?: number | null;
   contactoIdToUpdate?: number | null;
-  estadoEntidad?: "CLIENTE" | "INACTIVO" | "POTENCIAL";
+  estadoEntidad?: "CLIENTE" | "INACTIVO" | "POTENCIAL" | "NO_CONTACTAR";
   marcarBajaDefinitiva?: boolean;
 }) {
   const {
@@ -184,10 +188,12 @@ export function cambiarEtapa(params: {
 
       // Si la empresa (convenio corporativo) se da de baja, todos sus
       // contactos quedan dados de baja también, no solo la empresa.
+      // NO_CONTACTAR es una decisión sobre el convenio, no sobre cada empleado
+      // (misma regla que empresas.repository update()).
       await tx.contacto.updateMany({
         where: { empresaId: empresaIdToUpdate },
         data: {
-          estado: estadoEntidad,
+          estado: estadoEntidad === "NO_CONTACTAR" ? "INACTIVO" : estadoEntidad,
           ...(marcarBajaDefinitiva ? { bajaDefinitiva: true } : {}),
         },
       });

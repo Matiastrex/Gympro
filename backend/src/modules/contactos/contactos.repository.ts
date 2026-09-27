@@ -37,6 +37,6 @@ export function update(id: number, data: Prisma.ContactoUpdateInput) {
   return prisma.contacto.update({ where: { id }, data });
 }
 
-export function darDeBaja(id: number) {
-  return prisma.contacto.update({ where: { id }, data: { estado: "INACTIVO" } });
+export function darDeBaja(id: number, estado: "INACTIVO" | "NO_CONTACTAR") {
+  return prisma.contacto.update({ where: { id }, data: { estado } });
 }

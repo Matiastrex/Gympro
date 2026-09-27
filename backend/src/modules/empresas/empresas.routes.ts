@@ -41,6 +41,9 @@ empresasRouter.put(
 empresasRouter.post(
   "/:id/baja",
   asyncHandler(async (req, res) => {
-    res.json(await empresasService.darDeBaja(Number(req.params.id)));
+    const { contactarNuevamente, motivoBaja } = empresasService.bajaSchema.parse(req.body);
+    res.json(
+      await empresasService.darDeBaja(Number(req.params.id), contactarNuevamente, req.user!.userId, motivoBaja)
+    );
   })
 );
