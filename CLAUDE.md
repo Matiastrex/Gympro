@@ -141,24 +141,6 @@ matching the backend's current MVP scope.
 
 ## Known bugs to fix
 
-- **Creating or editing an oportunidad with a direct `etapaId` bypasses every `cambiarEtapa` business
-  rule.** Both `oportunidadesService.crear()` (`POST /api/oportunidades`) and `actualizar()`
-  (`PUT /api/oportunidades/:id`, submitted by the "Nueva oportunidad" / "Editar oportunidad" modals in
-  `OportunidadesPage.tsx`) write `etapaId` straight through the repository instead of going through
-  `cambiarEtapa()`, which is the only place that derives `estado`/`fechaRealCierre`, enforces
-  `motivoPerdida`, blocks changes once closed, and writes the `HistorialEtapa` audit row. Confirmed two
-  ways:
-  - Live in the current dev database: oportunidad id 12 ("Empleado Textil") sits in etapa "Inscripto"
-    (`tipo: GANADA`) with `estado: "ABIERTA"` and `fechaRealCierre: null`, because it was created
-    directly into that stage instead of moved there via `cambiar-etapa`.
-  - Reproduced via the API: an oportunidad moved to GANADA through `cambiar-etapa` (correctly getting
-    `estado: GANADA` + `fechaRealCierre`) and then edited back to an open etapa through the plain `PUT`
-    keeps `estado: GANADA` (now sitting in an open-type etapa) and adds **no** new `HistorialEtapa` row.
-  Either way, the embudo board and the oportunidades table end up disagreeing about whether the deal is
-  still open. Fix by having `crear()`/`actualizar()` derive `estado`/`fechaRealCierre` (and require
-  `motivoPerdida` for a PERDIDA etapa) the same way `cambiarEtapa()` does, or by stripping `etapaId` from
-  the general create/edit payload and forcing all stage assignment through `cambiar-etapa`.
-
 - **`probabilidadCierre` and `fechaEstimadaCierre` have no input anywhere in the UI.** Both fields
   exist on `Oportunidad` and are rendered on the embudo cards (the progress-bar percentage and the date
   pill), but `OportunidadesPage.tsx`'s create/edit form (`formVacio` and its submit `payload`) never
