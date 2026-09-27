@@ -1,6 +1,7 @@
 # Primera entrega — 24/9
 ## Objetivo
 Presentar una primera versión funcional que permita registrar clientes y gestionar oportunidades comerciales de manera básica.
+
 ---
 
 ## Funcionalidades requeridas
@@ -48,3 +49,31 @@ El grupo deberá poder:
 - Configuraciones generales.
 - Cierre completo de oportunidades.
 - Inteligencia artificial.
+
+# Entrega final — 12/11
+## Objetivo
+Presentar el CRM completo de acuerdo con la consigna general.
+
+---
+
+## Funcionalidades requeridas
+- Gestión de usuarios.
+- Roles de administrador, vendedor y responsable comercial.
+- Permisos según el rol.
+- Gestión completa de empresas y contactos.
+- Gestión de productos o servicios.
+- Asignación de responsables comerciales.
+- Gestión completa de oportunidades.
+- Embudo comercial configurable.
+- Cambio de etapas con historial.
+- Registro de actividades realizadas.
+- Historial comercial de empresas, contactos y oportunidades.
+- Cierre de oportunidades ganadas o perdidas.
+- Registro de motivos de pérdida.
+- Gestión de etapas, tipos de actividad, orígenes y motivos de pérdida.
+- Búsqueda, filtros y paginación.
+- Adaptación real al tipo de CRM o industria seleccionada.
+
+**Aclaración:** La incorporación de inteligencia artificial será opcional y deberá realizarse únicamente después de completar las funcionalidades principales.
+
+No se exige documentación adicional ni una arquitectura tecnológica determinada. Se evaluará el funcionamiento integral del producto y el cumplimiento de la consigna.
