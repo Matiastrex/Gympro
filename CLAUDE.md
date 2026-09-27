@@ -89,9 +89,32 @@ Key domain rules enforced in the service layer (see `oportunidades.service.ts`):
 - Moving into an `Etapa` whose `tipo` is `GANADA`/`PERDIDA` auto-derives `estado` and
   `fechaRealCierre` on the oportunidad; moving to `PERDIDA` additionally requires `motivoPerdida`.
 - Once an oportunidad's `estado` isn't `ABIERTA`, further stage changes are rejected outright (no
-  reopen flow yet — planned for the final delivery, gated by an authorization step).
+  reopen flow yet — planned for the final delivery, gated by an authorization step). The one
+  exception is Inscripto (`GANADA`) → "Inscripción cancelada" (`tipo: BAJA`), which is only reachable
+  from Inscripto and is itself terminal. It sets `estado: BAJA`, `fechaBaja` and `motivoBaja` (without
+  touching `fechaRealCierre`), leaves the contacto/empresa `INACTIVO` by default, and marks their
+  `bajaDefinitiva`, which blocks them from ever booking a clase de prueba again (`esClasePrueba`
+  etapas).
+- The internal identifiers for that etapa still say "baja" (enum `BAJA`, `fechaBaja`, `motivoBaja`,
+  `bajaDefinitiva`, CSS `is-baja`); only its name and the UI copy say "Inscripción cancelada". Don't
+  confuse it with the baja lógica of a contacto/empresa below.
 - The embudo board (`tableroEmbudo` / `GET /api/embudo`) groups **all** oportunidades by `etapaId`,
   not just open ones, so won/lost cards keep showing in their closing column instead of vanishing.
+
+Baja lógica of a contacto/empresa (`POST /api/contactos/:id/baja`, `POST /api/empresas/:id/baja`,
+body `{ contactarNuevamente: boolean, motivoBaja?: string }`) is a soft delete — there is no physical
+DELETE. It's triggered by the `baja-button` in each table's `row-actions` (left of Editar), which opens
+the shared `components/BajaModal.tsx`:
+- `contactarNuevamente: true` → estado `INACTIVO`; `false` → estado `NO_CONTACTAR`.
+- Rejected when the record has an open oportunidad (`oportunidadAbiertaId`), and for a contacto that
+  belongs to an empresa (its estado is driven by the empresa — dar de baja the empresa instead). The UI
+  disables the button in those cases, and also when the record is already `NO_CONTACTAR`.
+- If the record is `CLIENTE` with a won oportunidad, the baja moves that oportunidad to "Inscripción
+  cancelada" through `oportunidadesService.cancelarInscripcion()` → `cambiarEtapa()` (so the
+  historial row, `fechaBaja`, `motivoBaja` and `bajaDefinitiva` all apply), with the chosen estado
+  passed via `estadoEntidadBaja`. The modal then shows a warning and an optional motivo field.
+- Dando de baja an empresa also sets its contactos to `INACTIVO` — `NO_CONTACTAR` is a decision about
+  the convenio, not each employee (same rule as editing the empresa's estado).
 
 ### Domain vocabulary (gym-specific mapping — don't rename these back to generic CRM terms)
 
@@ -102,7 +125,8 @@ Key domain rules enforced in the service layer (see `oportunidades.service.ts`):
   same concept as GymPro's own SaaS pricing tiers.
 - **Oportunidad** = an in-progress membership inquiry.
 - **Etapas** (seeded, ordered): Consulta recibida → Clase de prueba agendada → Clase de prueba
-  realizada → Propuesta de membresía enviada → Negociación → Inscripto (Ganada) / Perdida.
+  realizada → Propuesta de membresía enviada → Negociación → Inscripto (Ganada) / Perdida, plus
+  Inscripción cancelada (`tipo: BAJA`, only reachable from Inscripto).
 
 ### Frontend
 
@@ -141,13 +165,6 @@ matching the backend's current MVP scope.
   includes them, so every oportunidad created or edited through the app has both permanently `null`.
   The embudo board silently falls back to an etapa-order heuristic for the percentage and shows "Sin
   fecha estimada" forever. Add inputs for these two fields to the oportunidad form.
-
-- **The baja lógica endpoints for contactos/empresas are unreachable from the UI.**
-  `POST /api/contactos/:id/baja` and `POST /api/empresas/:id/baja` exist and do a soft-delete
-  (`estado: INACTIVO`), but neither `ContactosPage.tsx` nor `EmpresasPage.tsx` ever calls them — the
-  only way to "dar de baja" a record today is to open the edit modal and manually pick `INACTIVO` from
-  the Estado dropdown. Either wire a "Dar de baja" action to the existing endpoint, or remove it if the
-  generic edit form is meant to be the only path.
 
 - **`CORS_ORIGIN`'s default doesn't track Vite's actual port.** `backend/src/config/env.ts` defaults
   `corsOrigin` to `http://localhost:5173`, but Vite auto-increments to 5174+ whenever 5173 is already
