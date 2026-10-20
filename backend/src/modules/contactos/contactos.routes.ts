@@ -40,6 +40,9 @@ contactosRouter.put(
 contactosRouter.post(
   "/:id/baja",
   asyncHandler(async (req, res) => {
-    res.json(await contactosService.darDeBaja(Number(req.params.id)));
+    const { contactarNuevamente, motivoBaja } = contactosService.bajaSchema.parse(req.body);
+    res.json(
+      await contactosService.darDeBaja(Number(req.params.id), contactarNuevamente, req.user!.userId, motivoBaja)
+    );
   })
 );

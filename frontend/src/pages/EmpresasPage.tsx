@@ -2,7 +2,8 @@ import { FormEvent, useEffect, useState } from "react";
 import { api } from "../api/client";
 import { Modal } from "../components/Modal";
 import { Badge } from "../components/Badge";
-import { PencilIcon, SearchIcon } from "../components/icons";
+import { BajaModal } from "../components/BajaModal";
+import { BajaIcon, PencilIcon, SearchIcon } from "../components/icons";
 
 interface Empresa {
   id: number;
@@ -47,6 +48,7 @@ export function EmpresasPage() {
   const [mostrarForm, setMostrarForm] = useState(false);
   const [editando, setEditando] = useState<Empresa | null>(null);
   const [detalle, setDetalle] = useState<EmpresaDetalle | null>(null);
+  const [dandoDeBaja, setDandoDeBaja] = useState<Empresa | null>(null);
 
   async function cargar(q?: string) {
     const res = await api.get("/empresas", { params: q ? { q } : undefined });
@@ -84,6 +86,24 @@ export function EmpresasPage() {
     });
     setError(null);
     setEditando(empresa);
+  }
+
+  function abrirBaja(empresa: Empresa, e: React.MouseEvent) {
+    e.stopPropagation();
+    setDandoDeBaja(empresa);
+  }
+
+  async function confirmarBaja(contactarNuevamente: boolean, motivoBaja?: string) {
+    if (!dandoDeBaja) return;
+    await api.post(`/empresas/${dandoDeBaja.id}/baja`, { contactarNuevamente, motivoBaja });
+    setDandoDeBaja(null);
+    await cargar(search || undefined);
+  }
+
+  function motivoBajaBloqueada(empresa: Empresa) {
+    if (empresa.estado === "NO_CONTACTAR") return "Ya está en No contactar";
+    if (empresa.oportunidadAbiertaId != null) return "Tiene una oportunidad abierta";
+    return null;
   }
 
   async function abrirDetalle(id: number) {
@@ -155,6 +175,15 @@ export function EmpresasPage() {
                 </td>
                 <td>
                   <div className="row-actions">
+                    <button
+                      className="icon-btn baja-button"
+                      onClick={(e) => abrirBaja(emp, e)}
+                      disabled={motivoBajaBloqueada(emp) !== null}
+                      title={motivoBajaBloqueada(emp) ?? "Dar de baja"}
+                      aria-label="Dar de baja"
+                    >
+                      <BajaIcon />
+                    </button>
                     <button className="icon-btn" onClick={(e) => abrirEdicion(emp, e)} aria-label="Editar">
                       <PencilIcon />
                     </button>
@@ -231,6 +260,15 @@ export function EmpresasPage() {
             </div>
           </form>
         </Modal>
+      )}
+
+      {dandoDeBaja && (
+        <BajaModal
+          nombre={dandoDeBaja.razonSocial}
+          cancelaInscripcion={dandoDeBaja.estado === "CLIENTE"}
+          onClose={() => setDandoDeBaja(null)}
+          onConfirm={confirmarBaja}
+        />
       )}
 
       {detalle && (

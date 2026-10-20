@@ -155,9 +155,9 @@ export function OportunidadesPage() {
   const formActivo = mostrarForm || editando !== null;
   const etapaSeleccionada = etapas.find((et) => et.id === Number(form.etapaId));
   const mostrarMotivoPerdida = editando !== null && etapaSeleccionada?.tipo == "PERDIDA";
-  // "Baja" solo es una opción válida si la oportunidad que se está editando está
+  // "Inscripción cancelada" solo es una opción válida si la oportunidad que se está editando está
   // actualmente en Inscripto (tipo GANADA); en creación, o editando cualquier
-  // otra etapa, no se debe poder elegir Baja directamente desde este formulario.
+  // otra etapa, no se debe poder elegir Inscripción cancelada directamente desde este formulario.
   const etapaActualTipo = editando ? etapas.find((et) => et.id === editando.etapaId)?.tipo : undefined;
   const etapasSeleccionables = etapas.filter((et) => et.tipo !== "BAJA" || etapaActualTipo === "GANADA");
 

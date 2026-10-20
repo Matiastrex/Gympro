@@ -27,7 +27,7 @@ async function main() {
     { nombre: "Negociación", orden: 5, tipo: "ABIERTA" as const },
     { nombre: "Inscripto", orden: 6, tipo: "GANADA" as const },
     { nombre: "Perdida", orden: 7, tipo: "PERDIDA" as const },
-    { nombre: "Baja", orden: 8, tipo: "BAJA" as const },
+    { nombre: "Inscripción cancelada", orden: 8, tipo: "BAJA" as const },
   ];
 
   for (const etapa of etapas) {

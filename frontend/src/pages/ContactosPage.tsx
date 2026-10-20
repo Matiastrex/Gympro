@@ -3,7 +3,8 @@ import { api } from "../api/client";
 import { Modal } from "../components/Modal";
 import { Badge } from "../components/Badge";
 import { Avatar } from "../components/Avatar";
-import { PencilIcon, SearchIcon } from "../components/icons";
+import { BajaModal } from "../components/BajaModal";
+import { BajaIcon, PencilIcon, SearchIcon } from "../components/icons";
 
 interface Empresa {
   id: number;
@@ -54,6 +55,7 @@ export function ContactosPage() {
   const [mostrarForm, setMostrarForm] = useState(false);
   const [editando, setEditando] = useState<Contacto | null>(null);
   const [detalle, setDetalle] = useState<ContactoDetalle | null>(null);
+  const [dandoDeBaja, setDandoDeBaja] = useState<Contacto | null>(null);
 
   async function cargar(q?: string) {
     const [resContactos, resEmpresas] = await Promise.all([
@@ -94,6 +96,25 @@ export function ContactosPage() {
     });
     setError(null);
     setEditando(contacto);
+  }
+
+  function abrirBaja(contacto: Contacto, e: React.MouseEvent) {
+    e.stopPropagation();
+    setDandoDeBaja(contacto);
+  }
+
+  async function confirmarBaja(contactarNuevamente: boolean, motivoBaja?: string) {
+    if (!dandoDeBaja) return;
+    await api.post(`/contactos/${dandoDeBaja.id}/baja`, { contactarNuevamente, motivoBaja });
+    setDandoDeBaja(null);
+    await cargar(search || undefined);
+  }
+
+  function motivoBajaBloqueada(contacto: Contacto) {
+    if (contacto.estado === "NO_CONTACTAR") return "Ya está en No contactar";
+    if (contacto.oportunidadAbiertaId != null) return "Tiene una oportunidad abierta";
+    if (contacto.empresaId != null) return "El estado depende de su empresa";
+    return null;
   }
 
   async function abrirDetalle(id: number) {
@@ -187,6 +208,15 @@ export function ContactosPage() {
                 </td>
                 <td>
                   <div className="row-actions">
+                    <button
+                      className="icon-btn baja-button"
+                      onClick={(e) => abrirBaja(c, e)}
+                      disabled={motivoBajaBloqueada(c) !== null}
+                      title={motivoBajaBloqueada(c) ?? "Dar de baja"}
+                      aria-label="Dar de baja"
+                    >
+                      <BajaIcon />
+                    </button>
                     <button className="icon-btn" onClick={(e) => abrirEdicion(c, e)} aria-label="Editar">
                       <PencilIcon />
                     </button>
@@ -274,6 +304,15 @@ export function ContactosPage() {
             </div>
           </form>
         </Modal>
+      )}
+
+      {dandoDeBaja && (
+        <BajaModal
+          nombre={`${dandoDeBaja.nombre} ${dandoDeBaja.apellido}`}
+          cancelaInscripcion={dandoDeBaja.estado === "CLIENTE"}
+          onClose={() => setDandoDeBaja(null)}
+          onConfirm={confirmarBaja}
+        />
       )}
 
       {detalle && (

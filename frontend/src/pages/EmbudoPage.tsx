@@ -149,7 +149,7 @@ export function EmbudoPage() {
     }
 
     if (etapaDestino.tipo === "BAJA" && columnaOrigen?.etapa.tipo !== "GANADA") {
-      setError("Solo se puede dar de baja una oportunidad que está en Inscripto");
+      setError("Solo se puede cancelar la inscripción de una oportunidad que está en Inscripto");
       return;
     }
 
@@ -297,11 +297,11 @@ export function EmbudoPage() {
       )}
 
       {baja && (
-        <Modal title="Dar de baja" onClose={() => setBaja(null)} width={420}>
+        <Modal title="Cancelar inscripción" onClose={() => setBaja(null)} width={420}>
           <form onSubmit={confirmarBaja}>
             <div className="form-grid">
               <label className="span-2">
-                Motivo de la baja (opcional)
+                Motivo de la cancelación (opcional)
                 <textarea value={motivoBaja} onChange={(e) => setMotivoBaja(e.target.value)} autoFocus />
               </label>
             </div>
@@ -310,7 +310,7 @@ export function EmbudoPage() {
                 Cancelar
               </button>
               <button type="submit" className="btn danger">
-                Dar de baja
+                Confirmar cancelación
               </button>
             </div>
           </form>

@@ -48,6 +48,12 @@ export function update(id: number, data: Prisma.EmpresaUpdateInput) {
 }
 
 // Baja lógica: nunca se borra físicamente una empresa con historial comercial.
-export function darDeBaja(id: number) {
-  return prisma.empresa.update({ where: { id }, data: { estado: "INACTIVO" } });
+// Igual que en update(), sus contactos pasan a INACTIVO (NO_CONTACTAR es una
+// decisión sobre el convenio, no sobre cada empleado).
+export function darDeBaja(id: number, estado: "INACTIVO" | "NO_CONTACTAR") {
+  return prisma.$transaction(async (tx) => {
+    const empresa = await tx.empresa.update({ where: { id }, data: { estado } });
+    await tx.contacto.updateMany({ where: { empresaId: id }, data: { estado: "INACTIVO" } });
+    return empresa;
+  });
 }
