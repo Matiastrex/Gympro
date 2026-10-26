@@ -115,8 +115,24 @@ export function findEmpresaParaCrear(id: number) {
   });
 }
 
-export function update(id: number, data: Prisma.OportunidadUpdateInput) {
-  return prisma.oportunidad.update({ where: { id }, data, include: includeCompleto });
+type Reasignacion = { responsableId: number | null; empresaId: number | null; contactoId: number | null };
+
+// Al reasignar una oportunidad, su contacto/empresa pasan al mismo responsable:
+// quien atiende la consulta es quien atiende al socio. Quien los creó los
+// sigue viendo en modo lectura (ver creadoPorId).
+async function reasignarEntidades(tx: Prisma.TransactionClient, { responsableId, empresaId, contactoId }: Reasignacion) {
+  if (empresaId != null) await tx.empresa.update({ where: { id: empresaId }, data: { responsableId } });
+  if (contactoId != null) await tx.contacto.update({ where: { id: contactoId }, data: { responsableId } });
+}
+
+export function update(id: number, data: Prisma.OportunidadUpdateInput, reasignarEntidadesA?: number | null) {
+  return prisma.$transaction(async (tx) => {
+    const oportunidad = await tx.oportunidad.update({ where: { id }, data, include: includeCompleto });
+    if (reasignarEntidadesA !== undefined) {
+      await reasignarEntidades(tx, { ...oportunidad, responsableId: reasignarEntidadesA });
+    }
+    return oportunidad;
+  });
 }
 
 // Agrupa las oportunidades por etapa para el tablero del embudo comercial.
@@ -124,9 +140,10 @@ export function update(id: number, data: Prisma.OportunidadUpdateInput) {
 // propio etapaId ya indica en qué columna va. Si acá filtráramos por estado
 // ABIERTA, las oportunidades recién cerradas (Inscripto/Perdida) desaparecerían
 // del tablero entero en vez de mostrarse en su columna de cierre.
-export async function findAgrupadasPorEtapa() {
+export async function findAgrupadasPorEtapa(filtros: { responsableId?: number }) {
   const etapas = await prisma.etapa.findMany({ orderBy: { orden: "asc" } });
   const oportunidades = await prisma.oportunidad.findMany({
+    where: { responsableId: filtros.responsableId },
     include: includeCompleto,
   });
 
@@ -152,6 +169,8 @@ export function cambiarEtapa(params: {
   contactoIdToUpdate?: number | null;
   estadoEntidad?: "CLIENTE" | "INACTIVO" | "POTENCIAL" | "NO_CONTACTAR";
   marcarBajaDefinitiva?: boolean;
+  // Presente si en la misma edición también se cambió el responsable.
+  reasignarEntidadesA?: number | null;
 }) {
   const {
     oportunidadId,
@@ -167,6 +186,7 @@ export function cambiarEtapa(params: {
     contactoIdToUpdate,
     estadoEntidad,
     marcarBajaDefinitiva,
+    reasignarEntidadesA,
   } = params;
 
   return prisma.$transaction(async (tx) => {
@@ -208,6 +228,10 @@ export function cambiarEtapa(params: {
           ...(marcarBajaDefinitiva ? { bajaDefinitiva: true } : {}),
         },
       });
+    }
+
+    if (reasignarEntidadesA !== undefined) {
+      await reasignarEntidades(tx, { ...oportunidad, responsableId: reasignarEntidadesA });
     }
 
     await tx.historialEtapa.create({

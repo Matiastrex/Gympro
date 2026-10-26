@@ -5,6 +5,7 @@ import { Badge } from "../components/Badge";
 import { Avatar } from "../components/Avatar";
 import { PencilIcon, SearchIcon } from "../components/icons";
 import { HistorialEtapas, HistorialEtapaItem } from "../components/HistorialEtapas";
+import { ResponsableSelect } from "../components/ResponsableSelect";
 
 interface Opcion {
   id: number;
@@ -38,6 +39,14 @@ interface OportunidadDetalle extends Oportunidad {
   historialEtapas: HistorialEtapaItem[];
 }
 
+// Un vendedor solo recibe sus propios contactos/empresas. Si se le reasignó
+// una oportunidad vinculada a uno ajeno, se agrega igual como opción para que
+// el formulario lo muestre (el backend acepta conservar ese vínculo).
+function conVinculoActual(opciones: Opcion[], id: number | null | undefined, actual: Omit<Opcion, "id"> | null | undefined) {
+  if (id == null || !actual || opciones.some((o) => o.id === id)) return opciones;
+  return [{ id, ...actual }, ...opciones];
+}
+
 const formVacio = {
   titulo: "",
   contactoId: "",
@@ -55,7 +64,6 @@ export function OportunidadesPage() {
   const [contactos, setContactos] = useState<Opcion[]>([]);
   const [empresas, setEmpresas] = useState<Opcion[]>([]);
   const [productos, setProductos] = useState<Opcion[]>([]);
-  const [usuarios, setUsuarios] = useState<Opcion[]>([]);
   const [etapas, setEtapas] = useState<Opcion[]>([]);
   const [search, setSearch] = useState("");
   const [form, setForm] = useState(formVacio);
@@ -65,19 +73,17 @@ export function OportunidadesPage() {
   const [detalle, setDetalle] = useState<OportunidadDetalle | null>(null);
 
   async function cargar() {
-    const [ops, cs, es, ps, us, et] = await Promise.all([
+    const [ops, cs, es, ps, et] = await Promise.all([
       api.get("/oportunidades"),
       api.get("/contactos"),
       api.get("/empresas"),
       api.get("/productos"),
-      api.get("/usuarios"),
       api.get("/etapas"),
     ]);
     setOportunidades(ops.data);
     setContactos(cs.data);
     setEmpresas(es.data);
     setProductos(ps.data);
-    setUsuarios(us.data);
     setEtapas(et.data);
   }
 
@@ -153,6 +159,8 @@ export function OportunidadesPage() {
   }
 
   const formActivo = mostrarForm || editando !== null;
+  const opcionesContacto = conVinculoActual(contactos, editando?.contactoId, editando?.contacto);
+  const opcionesEmpresa = conVinculoActual(empresas, editando?.empresaId, editando?.empresa);
   const etapaSeleccionada = etapas.find((et) => et.id === Number(form.etapaId));
   const mostrarMotivoPerdida = editando !== null && etapaSeleccionada?.tipo == "PERDIDA";
   // "Inscripción cancelada" solo es una opción válida si la oportunidad que se está editando está
@@ -262,17 +270,10 @@ export function OportunidadesPage() {
                   ))}
                 </select>
               </label>
-              <label>
-                Responsable
-                <select value={form.responsableId} onChange={(e) => setForm({ ...form, responsableId: e.target.value })}>
-                  <option value="">Sin asignar</option>
-                  {usuarios.map((u) => (
-                    <option key={u.id} value={u.id}>
-                      {u.nombre} {u.apellido}
-                    </option>
-                  ))}
-                </select>
-              </label>
+              <ResponsableSelect
+                value={form.responsableId}
+                onChange={(responsableId) => setForm((f) => ({ ...f, responsableId }))}
+              />
               {mostrarMotivoPerdida && (
                 <label className="span-2">
                   Motivo de pérdida *
@@ -287,7 +288,7 @@ export function OportunidadesPage() {
                   onChange={(e) => setForm({ ...form, contactoId: e.target.value, empresaId: "" })}
                 >
                   <option value="">— ninguno —</option>
-                  {contactos.map((c) => (
+                  {opcionesContacto.map((c) => (
                     <option key={c.id} value={c.id}>
                       {c.nombre} {c.apellido}
                     </option>
@@ -302,7 +303,7 @@ export function OportunidadesPage() {
                   onChange={(e) => setForm({ ...form, empresaId: e.target.value, contactoId: "" })}
                 >
                   <option value="">— ninguna —</option>
-                  {empresas.map((emp) => (
+                  {opcionesEmpresa.map((emp) => (
                     <option key={emp.id} value={emp.id}>
                       {emp.razonSocial}
                     </option>

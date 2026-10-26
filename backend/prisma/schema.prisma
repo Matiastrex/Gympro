@@ -56,6 +56,8 @@ model Usuario {
 
   empresasResponsable   Empresa[]        @relation("ResponsableEmpresa")
   contactosResponsable  Contacto[]       @relation("ResponsableContacto")
+  empresasCreadas       Empresa[]        @relation("CreadorEmpresa")
+  contactosCreados      Contacto[]       @relation("CreadorContacto")
   oportunidades         Oportunidad[]    @relation("ResponsableOportunidad")
   actividades           Actividad[]
   cambiosDeEtapa        HistorialEtapa[]
@@ -82,6 +84,11 @@ model Empresa {
 
   responsableId Int?
   responsable   Usuario? @relation("ResponsableEmpresa", fields: [responsableId], references: [id])
+
+  // Quién la cargó. Un vendedor sigue viendo (solo lectura) lo que creó
+  // aunque después se lo reasignen a otro.
+  creadoPorId Int?
+  creadoPor   Usuario? @relation("CreadorEmpresa", fields: [creadoPorId], references: [id])
 
   contactos     Contacto[]
   oportunidades Oportunidad[]
@@ -111,6 +118,10 @@ model Contacto {
 
   responsableId Int?
   responsable   Usuario? @relation("ResponsableContacto", fields: [responsableId], references: [id])
+
+  // Ver Empresa.creadoPorId.
+  creadoPorId Int?
+  creadoPor   Usuario? @relation("CreadorContacto", fields: [creadoPorId], references: [id])
 
   oportunidades Oportunidad[]
   actividades   Actividad[]

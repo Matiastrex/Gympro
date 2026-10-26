@@ -10,7 +10,7 @@ embudoRouter.use(requireAuth);
 // el tablero (una columna por etapa) en el frontend.
 embudoRouter.get(
   "/",
-  asyncHandler(async (_req, res) => {
-    res.json(await oportunidadesService.tableroEmbudo());
+  asyncHandler(async (req, res) => {
+    res.json(await oportunidadesService.tableroEmbudo(req.user!));
   })
 );

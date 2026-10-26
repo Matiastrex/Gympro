@@ -2,6 +2,10 @@ import { FormEvent, useEffect, useState } from "react";
 import { api } from "../api/client";
 import { Modal } from "../components/Modal";
 import { Badge } from "../components/Badge";
+import { Avatar } from "../components/Avatar";
+import { ResponsableSelect } from "../components/ResponsableSelect";
+import { useAuth } from "../context/AuthContext";
+import { veTodo } from "../constants/roles";
 import { BajaModal } from "../components/BajaModal";
 import { BajaIcon, PencilIcon, SearchIcon } from "../components/icons";
 
@@ -18,6 +22,8 @@ interface Empresa {
   oportunidadAbiertaId?: number | null;
   origen?: string | null;
   observaciones?: string | null;
+  responsableId?: number | null;
+  responsable?: { id: number; nombre: string; apellido: string } | null;
 }
 
 interface EmpresaDetalle extends Empresa {
@@ -38,9 +44,11 @@ const formVacio = {
   estado: "POTENCIAL",
   origen: "",
   observaciones: "",
+  responsableId: "",
 };
 
 export function EmpresasPage() {
+  const { usuario } = useAuth();
   const [empresas, setEmpresas] = useState<Empresa[]>([]);
   const [search, setSearch] = useState("");
   const [form, setForm] = useState(formVacio);
@@ -83,6 +91,7 @@ export function EmpresasPage() {
       estado: empresa.estado,
       origen: empresa.origen ?? "",
       observaciones: empresa.observaciones ?? "",
+      responsableId: empresa.responsableId ? String(empresa.responsableId) : "",
     });
     setError(null);
     setEditando(empresa);
@@ -100,7 +109,16 @@ export function EmpresasPage() {
     await cargar(search || undefined);
   }
 
+  // Un vendedor ve también lo que cargó y después se reasignó a otro, pero
+  // solo para consultarlo: editar y dar de baja es del responsable actual.
+  function motivoSoloLectura(empresa: Empresa) {
+    if (veTodo(usuario?.rol) || empresa.responsableId === usuario?.id) return null;
+    return "Asignado a otro vendedor: solo podés consultarlo";
+  }
+
   function motivoBajaBloqueada(empresa: Empresa) {
+    const soloLectura = motivoSoloLectura(empresa);
+    if (soloLectura) return soloLectura;
     if (empresa.estado === "NO_CONTACTAR") return "Ya está en No contactar";
     if (empresa.oportunidadAbiertaId != null) return "Tiene una oportunidad abierta";
     return null;
@@ -114,12 +132,13 @@ export function EmpresasPage() {
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
+    const payload = { ...form, responsableId: form.responsableId ? Number(form.responsableId) : null };
     try {
       if (editando) {
-        await api.put(`/empresas/${editando.id}`, form);
+        await api.put(`/empresas/${editando.id}`, payload);
         setEditando(null);
       } else {
-        await api.post("/empresas", form);
+        await api.post("/empresas", payload);
         setMostrarForm(false);
       }
       await cargar(search || undefined);
@@ -160,6 +179,7 @@ export function EmpresasPage() {
               <th>Razón social</th>
               <th>Email</th>
               <th>Teléfono</th>
+              <th>Responsable</th>
               <th>Estado</th>
               <th></th>
             </tr>
@@ -170,6 +190,16 @@ export function EmpresasPage() {
                 <td className="cell-primary">{emp.razonSocial}</td>
                 <td className="cell-muted">{emp.email || "—"}</td>
                 <td className="cell-muted">{emp.telefono || "—"}</td>
+                <td>
+                  {emp.responsable ? (
+                    <div className="cell-user">
+                      <Avatar nombre={emp.responsable.nombre} apellido={emp.responsable.apellido} size={24} />
+                      <span className="cell-muted">{emp.responsable.nombre}</span>
+                    </div>
+                  ) : (
+                    <span className="cell-muted">Sin asignar</span>
+                  )}
+                </td>
                 <td>
                   <Badge value={emp.estado} />
                 </td>
@@ -184,7 +214,13 @@ export function EmpresasPage() {
                     >
                       <BajaIcon />
                     </button>
-                    <button className="icon-btn" onClick={(e) => abrirEdicion(emp, e)} aria-label="Editar">
+                    <button
+                      className="icon-btn"
+                      onClick={(e) => abrirEdicion(emp, e)}
+                      disabled={motivoSoloLectura(emp) !== null}
+                      title={motivoSoloLectura(emp) ?? "Editar"}
+                      aria-label="Editar"
+                    >
                       <PencilIcon />
                     </button>
                   </div>
@@ -193,7 +229,7 @@ export function EmpresasPage() {
             ))}
             {empresas.length === 0 && (
               <tr className="row-empty">
-                <td colSpan={5} className="empty-state">
+                <td colSpan={6} className="empty-state">
                   Todavía no hay empresas cargadas
                 </td>
               </tr>
@@ -245,6 +281,11 @@ export function EmpresasPage() {
                 Sitio web
                 <input value={form.sitioWeb} onChange={(e) => setForm({ ...form, sitioWeb: e.target.value })} />
               </label>
+              <ResponsableSelect
+                className="span-2"
+                value={form.responsableId}
+                onChange={(responsableId) => setForm((f) => ({ ...f, responsableId }))}
+              />
               <label className="span-2">
                 Observaciones
                 <textarea value={form.observaciones} onChange={(e) => setForm({ ...form, observaciones: e.target.value })} />
@@ -279,6 +320,10 @@ export function EmpresasPage() {
               <dd>
                 <Badge value={detalle.estado} />
               </dd>
+            </div>
+            <div className="detail-item">
+              <dt>Responsable</dt>
+              <dd>{detalle.responsable ? `${detalle.responsable.nombre} ${detalle.responsable.apellido}` : "Sin asignar"}</dd>
             </div>
             <div className="detail-item">
               <dt>CUIT</dt>

@@ -10,14 +10,14 @@ empresasRouter.get(
   "/",
   asyncHandler(async (req, res) => {
     const filtro = typeof req.query.q === "string" ? req.query.q : undefined;
-    res.json(await empresasService.listar(filtro));
+    res.json(await empresasService.listar(req.user!, filtro));
   })
 );
 
 empresasRouter.get(
   "/:id",
   asyncHandler(async (req, res) => {
-    res.json(await empresasService.obtener(Number(req.params.id)));
+    res.json(await empresasService.obtener(Number(req.params.id), req.user!, "ver"));
   })
 );
 
@@ -25,7 +25,7 @@ empresasRouter.post(
   "/",
   asyncHandler(async (req, res) => {
     const data = empresasService.empresaSchema.parse(req.body);
-    res.status(201).json(await empresasService.crear(data));
+    res.status(201).json(await empresasService.crear(data, req.user!));
   })
 );
 
@@ -33,7 +33,7 @@ empresasRouter.put(
   "/:id",
   asyncHandler(async (req, res) => {
     const data = empresasService.empresaSchema.parse(req.body);
-    res.json(await empresasService.actualizar(Number(req.params.id), data));
+    res.json(await empresasService.actualizar(Number(req.params.id), data, req.user!));
   })
 );
 
@@ -43,7 +43,7 @@ empresasRouter.post(
   asyncHandler(async (req, res) => {
     const { contactarNuevamente, motivoBaja } = empresasService.bajaSchema.parse(req.body);
     res.json(
-      await empresasService.darDeBaja(Number(req.params.id), contactarNuevamente, req.user!.userId, motivoBaja)
+      await empresasService.darDeBaja(Number(req.params.id), contactarNuevamente, req.user!, motivoBaja)
     );
   })
 );

@@ -4,6 +4,9 @@ import { Modal } from "../components/Modal";
 import { Badge } from "../components/Badge";
 import { Avatar } from "../components/Avatar";
 import { BajaModal } from "../components/BajaModal";
+import { ResponsableSelect } from "../components/ResponsableSelect";
+import { useAuth } from "../context/AuthContext";
+import { veTodo } from "../constants/roles";
 import { BajaIcon, PencilIcon, SearchIcon } from "../components/icons";
 
 interface Empresa {
@@ -26,6 +29,8 @@ interface Contacto {
   oportunidadAbiertaId?: number | null;
   empresaId?: number | null;
   empresa?: { id: number; razonSocial: string } | null;
+  responsableId?: number | null;
+  responsable?: { id: number; nombre: string; apellido: string } | null;
 }
 
 interface ContactoDetalle extends Contacto {
@@ -44,9 +49,11 @@ const formVacio = {
   empresaId: "",
   estado: "POTENCIAL",
   observaciones: "",
+  responsableId: "",
 };
 
 export function ContactosPage() {
+  const { usuario } = useAuth();
   const [contactos, setContactos] = useState<Contacto[]>([]);
   const [empresas, setEmpresas] = useState<Empresa[]>([]);
   const [search, setSearch] = useState("");
@@ -93,6 +100,7 @@ export function ContactosPage() {
       empresaId: contacto.empresaId ? String(contacto.empresaId) : "",
       estado: contacto.estado,
       observaciones: contacto.observaciones ?? "",
+      responsableId: contacto.responsableId ? String(contacto.responsableId) : "",
     });
     setError(null);
     setEditando(contacto);
@@ -110,7 +118,16 @@ export function ContactosPage() {
     await cargar(search || undefined);
   }
 
+  // Un vendedor ve también lo que cargó y después se reasignó a otro, pero
+  // solo para consultarlo: editar y dar de baja es del responsable actual.
+  function motivoSoloLectura(contacto: Contacto) {
+    if (veTodo(usuario?.rol) || contacto.responsableId === usuario?.id) return null;
+    return "Asignado a otro vendedor: solo podés consultarlo";
+  }
+
   function motivoBajaBloqueada(contacto: Contacto) {
+    const soloLectura = motivoSoloLectura(contacto);
+    if (soloLectura) return soloLectura;
     if (contacto.estado === "NO_CONTACTAR") return "Ya está en No contactar";
     if (contacto.oportunidadAbiertaId != null) return "Tiene una oportunidad abierta";
     if (contacto.empresaId != null) return "El estado depende de su empresa";
@@ -128,6 +145,7 @@ export function ContactosPage() {
     const payload = {
       ...form,
       empresaId: form.empresaId ? Number(form.empresaId) : null,
+      responsableId: form.responsableId ? Number(form.responsableId) : null,
       estado: estadoPorEmpresa ?? form.estado,
     };
     try {
@@ -185,6 +203,7 @@ export function ContactosPage() {
               <th>Email</th>
               <th>Teléfono</th>
               <th>Empresa</th>
+              <th>Responsable</th>
               <th>Estado</th>
               <th></th>
             </tr>
@@ -193,7 +212,7 @@ export function ContactosPage() {
             {contactos.map((c) => (
               <tr key={c.id} onClick={() => abrirDetalle(c.id)}>
                 <td>
-                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <div className="cell-user">
                     <Avatar nombre={c.nombre} apellido={c.apellido} />
                     <span className="cell-primary">
                       {c.nombre} {c.apellido}
@@ -203,6 +222,16 @@ export function ContactosPage() {
                 <td className="cell-muted">{c.email || "—"}</td>
                 <td className="cell-muted">{c.telefono || "—"}</td>
                 <td className="cell-muted">{c.empresa?.razonSocial ?? "—"}</td>
+                <td>
+                  {c.responsable ? (
+                    <div className="cell-user">
+                      <Avatar nombre={c.responsable.nombre} apellido={c.responsable.apellido} size={24} />
+                      <span className="cell-muted">{c.responsable.nombre}</span>
+                    </div>
+                  ) : (
+                    <span className="cell-muted">Sin asignar</span>
+                  )}
+                </td>
                 <td>
                   <Badge value={c.estado} />
                 </td>
@@ -217,7 +246,13 @@ export function ContactosPage() {
                     >
                       <BajaIcon />
                     </button>
-                    <button className="icon-btn" onClick={(e) => abrirEdicion(c, e)} aria-label="Editar">
+                    <button
+                      className="icon-btn"
+                      onClick={(e) => abrirEdicion(c, e)}
+                      disabled={motivoSoloLectura(c) !== null}
+                      title={motivoSoloLectura(c) ?? "Editar"}
+                      aria-label="Editar"
+                    >
                       <PencilIcon />
                     </button>
                   </div>
@@ -226,7 +261,7 @@ export function ContactosPage() {
             ))}
             {contactos.length === 0 && (
               <tr className="row-empty">
-                <td colSpan={6} className="empty-state">
+                <td colSpan={7} className="empty-state">
                   Todavía no hay contactos cargados
                 </td>
               </tr>
@@ -289,6 +324,11 @@ export function ContactosPage() {
                   ))}
                 </select>
               </label>
+              <ResponsableSelect
+                className="span-2"
+                value={form.responsableId}
+                onChange={(responsableId) => setForm((f) => ({ ...f, responsableId }))}
+              />
               <label className="span-2">
                 Observaciones
                 <textarea value={form.observaciones} onChange={(e) => setForm({ ...form, observaciones: e.target.value })} />
@@ -326,6 +366,10 @@ export function ContactosPage() {
               <dd>
                 <Badge value={detalle.estado} />
               </dd>
+            </div>
+            <div className="detail-item">
+              <dt>Responsable</dt>
+              <dd>{detalle.responsable ? `${detalle.responsable.nombre} ${detalle.responsable.apellido}` : "Sin asignar"}</dd>
             </div>
             <div className="detail-item">
               <dt>Empresa</dt>

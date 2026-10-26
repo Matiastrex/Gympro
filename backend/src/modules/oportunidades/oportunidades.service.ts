@@ -3,6 +3,7 @@ import { Prisma } from "@prisma/client";
 import { ApiError } from "../../utils/apiError";
 import { prisma } from "../../config/db";
 import * as oportunidadesRepo from "./oportunidades.repository";
+import { Actor, alcance, resolverResponsable, verificarAcceso, verificarAccesoRelacion } from "../../utils/permisos";
 
 export const oportunidadSchema = z.object({
   titulo: z.string().min(1, "El título es obligatorio"),
@@ -21,14 +22,27 @@ export const oportunidadSchema = z.object({
 
 export type OportunidadInput = z.infer<typeof oportunidadSchema>;
 
-export function listar(filtros: { etapaId?: number; responsableId?: number }) {
-  return oportunidadesRepo.findAll(filtros);
+// Para un vendedor, alcance() pisa cualquier responsableId pedido: solo ve lo suyo.
+export function listar(filtros: { etapaId?: number; responsableId?: number }, actor: Actor) {
+  return oportunidadesRepo.findAll({ ...filtros, ...alcance(actor) });
 }
 
-export async function obtener(id: number) {
+// Sin actor no se controla el acceso: es para llamadas internas (p. ej. la
+// baja de un contacto/empresa, que ya verificó el permiso sobre la entidad).
+export async function obtener(id: number, actor?: Actor) {
   const oportunidad = await oportunidadesRepo.findById(id);
   if (!oportunidad) throw ApiError.notFound("Oportunidad no encontrada");
+  if (actor) verificarAcceso(actor, oportunidad, "oportunidad");
   return oportunidad;
+}
+
+async function verificarAccesoRelaciones(
+  actor: Actor,
+  data: OportunidadInput,
+  actual?: { empresaId: number | null; contactoId: number | null }
+) {
+  if (data.empresaId !== actual?.empresaId) await verificarAccesoRelacion(actor, "empresa", data.empresaId);
+  if (data.contactoId !== actual?.contactoId) await verificarAccesoRelacion(actor, "contacto", data.contactoId);
 }
 
 function validarRelacionComercial(data: OportunidadInput) {
@@ -39,8 +53,10 @@ function validarRelacionComercial(data: OportunidadInput) {
   }
 }
 
-export async function crear(data: OportunidadInput, usuarioId: number) {
-  validarRelacionComercial(data);
+export async function crear(input: OportunidadInput, actor: Actor) {
+  validarRelacionComercial(input);
+  await verificarAccesoRelaciones(actor, input);
+  const data = { ...input, responsableId: await resolverResponsable(actor, input.responsableId) };
 
   const etapa = await oportunidadesRepo.findEtapaTipo(data.etapaId);
   if (!etapa) throw ApiError.notFound("Etapa no encontrada");
@@ -101,17 +117,24 @@ export async function crear(data: OportunidadInput, usuarioId: number) {
     motivoPerdida: etapa.tipo === "PERDIDA" ? data.motivoPerdida : null,
   };
 
-  return oportunidadesRepo.create(dataConEstado as any, estadoEntidad, usuarioId);
+  return oportunidadesRepo.create(dataConEstado as any, estadoEntidad, actor.userId);
 }
 
-export async function historial(oportunidadId: number) {
-  await obtener(oportunidadId);
+export async function historial(oportunidadId: number, actor: Actor) {
+  await obtener(oportunidadId, actor);
   return oportunidadesRepo.findHistorial(oportunidadId);
 }
 
-export async function actualizar(id: number, data: OportunidadInput, usuarioId: number) {
-  const oportunidad = await obtener(id);
-  validarRelacionComercial(data);
+export async function actualizar(id: number, input: OportunidadInput, actor: Actor) {
+  const oportunidad = await obtener(id, actor);
+  validarRelacionComercial(input);
+  await verificarAccesoRelaciones(actor, input, oportunidad);
+  const data = {
+    ...input,
+    responsableId: await resolverResponsable(actor, input.responsableId, oportunidad.responsableId),
+  };
+  const usuarioId = actor.userId;
+  const reasignarEntidadesA = data.responsableId !== oportunidad.responsableId ? data.responsableId : undefined;
 
   const etapa = await oportunidadesRepo.findEtapaTipo(data.etapaId);
   if (!etapa) throw ApiError.notFound("Etapa no encontrada");
@@ -130,20 +153,23 @@ export async function actualizar(id: number, data: OportunidadInput, usuarioId: 
       observacion: data.observaciones ?? undefined,
       motivoPerdida: motivo ?? undefined,
       camposActualizacion: { ...camposActualizacion, motivoPerdida: motivo },
+      reasignarEntidadesA,
     });
   }
 
-  return oportunidadesRepo.update(id, { ...camposActualizacion, motivoPerdida: motivo } as any);
+  return oportunidadesRepo.update(id, { ...camposActualizacion, motivoPerdida: motivo } as any, reasignarEntidadesA);
 }
 
-export function tableroEmbudo() {
-  return oportunidadesRepo.findAgrupadasPorEtapa();
+export function tableroEmbudo(actor: Actor) {
+  return oportunidadesRepo.findAgrupadasPorEtapa(alcance(actor));
 }
 
 export async function cambiarEtapa(params: {
   oportunidadId: number;
   etapaNuevaId: number;
   usuarioId: number;
+  // Presente cuando el pedido viene de la ruta: verifica que pueda moverla.
+  actor?: Actor;
   observacion?: string;
   motivoPerdida?: string;
   motivoBaja?: string;
@@ -152,8 +178,9 @@ export async function cambiarEtapa(params: {
   // pedir NO_CONTACTAR.
   estadoEntidadBaja?: "INACTIVO" | "NO_CONTACTAR";
   camposActualizacion?: Prisma.OportunidadUncheckedUpdateInput;
+  reasignarEntidadesA?: number | null;
 }) {
-  const oportunidad = await obtener(params.oportunidadId);
+  const oportunidad = await obtener(params.oportunidadId, params.actor);
 
   const etapaNueva = await prisma.etapa.findUnique({ where: { id: params.etapaNuevaId } });
   if (!etapaNueva) throw ApiError.notFound("Etapa no encontrada");
@@ -246,6 +273,7 @@ export async function cambiarEtapa(params: {
     contactoIdToUpdate: oportunidad.contactoId,
     estadoEntidad,
     marcarBajaDefinitiva: etapaNueva.tipo === "BAJA",
+    reasignarEntidadesA: params.reasignarEntidadesA,
   });
 }
 

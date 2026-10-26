@@ -73,8 +73,30 @@ and just `throw`.
 Auth is a JWT bearer token (`utils/jwt.ts`, `middlewares/auth.middleware.ts`) checked per-router with
 `router.use(requireAuth)`. `requireAuth` re-reads the usuario on every request, so `req.user`
 (`{ userId, rol }`) carries the **current** rol, and a usuario with `activo: false` gets a 401 even with
-a still-valid token. Gate routes with `requireRole(...roles)` (`middlewares/role.middleware.ts`) after
-`requireAuth`; so far only the usuarios management routes use it.
+a still-valid token. Gate whole routes with `requireRole(...roles)` (`middlewares/role.middleware.ts`)
+after `requireAuth`; so far only the usuarios management routes use it.
+
+Per-record permissions live in `utils/permisos.ts`, and services receive the `actor` (`req.user!`):
+- ADMINISTRADOR and RESPONSABLE_COMERCIAL (`veTodo`) see everything and can assign/reassign
+  `responsableId` to any active usuario. A VENDEDOR only sees records where they are the responsable:
+  `alcance(actor)` adds `{ responsableId }` to listados and to the embudo, and `verificarAcceso` returns
+  403 on detail/edit/baja/cambiar-etapa of someone else's record.
+- Contactos and empresas also store `creadoPorId`. A VENDEDOR's listado of those two includes what they
+  created (`alcanceConCreador`), and `obtener(id, actor, "ver")` lets the creator open the detail.
+  That access is read-only: edit/baja use the default `"editar"` mode, which requires being the current
+  responsable. The UI disables those buttons in that case.
+- Reassigning an oportunidad (`responsableId` changes in `actualizar`) also reassigns its contacto/empresa
+  in the same transaction (`reasignarEntidades` in the repository, on both the plain update path and the
+  `cambiarEtapa` path).
+- `resolverResponsable` decides the stored responsable: whatever a VENDEDOR creates is assigned to them,
+  and they can't reassign it (403). Use it in every create/update of empresa, contacto or oportunidad.
+- `verificarAccesoRelacion` stops a VENDEDOR from linking a contacto to someone else's empresa, or an
+  oportunidad to someone else's empresa/contacto.
+- `oportunidadesService.obtener(id, actor?)` and `cambiarEtapa({ actor? })` skip the check when `actor`
+  is omitted. That's only for internal calls, like `cancelarInscripcion` from a baja, which already
+  checked access on the contacto/empresa. Routes must always pass the actor.
+- Frontend mirror: `veTodo(rol)` in `constants/roles.ts`, and `components/ResponsableSelect.tsx` (used by
+  the empresa, contacto and oportunidad forms) renders a locked "(vos)" select for a VENDEDOR.
 
 Usuarios (`modules/usuarios`, page `UsuariosPage.tsx`, admin-only) have no DELETE — they're deactivated
 with `activo: false`. The service rejects an admin changing their own rol or deactivating themselves,

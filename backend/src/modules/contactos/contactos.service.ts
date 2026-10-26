@@ -2,6 +2,7 @@ import { z } from "zod";
 import { ApiError } from "../../utils/apiError";
 import * as contactosRepo from "./contactos.repository";
 import * as oportunidadesService from "../oportunidades/oportunidades.service";
+import { Actor, Modo, alcanceConCreador, resolverResponsable, verificarAcceso, verificarAccesoRelacion } from "../../utils/permisos";
 
 export const contactoSchema = z.object({
   nombre: z.string().min(1, "El nombre es obligatorio"),
@@ -24,32 +25,39 @@ export const bajaSchema = z.object({
   motivoBaja: z.string().optional(),
 });
 
-export function listar(filtro?: string) {
-  return contactosRepo.findAll(filtro);
+export function listar(actor: Actor, filtro?: string) {
+  return contactosRepo.findAll({ filtro, visibilidad: alcanceConCreador(actor) });
 }
 
-export async function obtener(id: number) {
+export async function obtener(id: number, actor: Actor, modo: Modo = "editar") {
   const contacto = await contactosRepo.findById(id);
   if (!contacto) throw ApiError.notFound("Contacto no encontrado");
+  verificarAcceso(actor, contacto, "contacto", modo);
   return contacto;
 }
 
-export function crear(data: ContactoInput) {
-  return contactosRepo.create(data as any);
+export async function crear(data: ContactoInput, actor: Actor) {
+  await verificarAccesoRelacion(actor, "empresa", data.empresaId);
+  const responsableId = await resolverResponsable(actor, data.responsableId);
+  return contactosRepo.create({ ...data, responsableId, creadoPorId: actor.userId } as any);
 }
 
-export async function actualizar(id: number, data: ContactoInput) {
-  await obtener(id);
-  return contactosRepo.update(id, data as any);
+export async function actualizar(id: number, data: ContactoInput, actor: Actor) {
+  const contacto = await obtener(id, actor);
+  if (data.empresaId !== contacto.empresaId) {
+    await verificarAccesoRelacion(actor, "empresa", data.empresaId);
+  }
+  const responsableId = await resolverResponsable(actor, data.responsableId, contacto.responsableId);
+  return contactosRepo.update(id, { ...data, responsableId } as any);
 }
 
 export async function darDeBaja(
   id: number,
   contactarNuevamente: boolean,
-  usuarioId: number,
+  actor: Actor,
   motivoBaja?: string
 ) {
-  const contacto = await obtener(id);
+  const contacto = await obtener(id, actor);
   // Mismas restricciones que el formulario de edición: con una oportunidad
   // abierta o con convenio corporativo, el estado del contacto no se toca a mano.
   if (contacto.oportunidadAbiertaId != null) {
@@ -67,11 +75,11 @@ export async function darDeBaja(
   if (inscripcion) {
     await oportunidadesService.cancelarInscripcion({
       oportunidadId: inscripcion.id,
-      usuarioId,
+      usuarioId: actor.userId,
       motivoBaja,
       estadoEntidad: estado,
     });
-    return obtener(id);
+    return obtener(id, actor);
   }
 
   return contactosRepo.darDeBaja(id, estado);

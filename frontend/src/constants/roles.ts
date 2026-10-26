@@ -14,3 +14,11 @@ export const ROL_DESCRIPCION = {
   RESPONSABLE_COMERCIAL: "Supervisa el embudo de todo el equipo y reasigna oportunidades.",
   VENDEDOR: "Atiende sus propios socios y consultas, y mueve sus oportunidades.",
 } as const satisfies Record<Rol, string>;
+
+// Espejo de backend/src/utils/permisos.ts: estos roles ven la cartera de todo
+// el equipo y pueden asignar/reasignar responsables. El vendedor solo ve lo suyo.
+export const ROLES_CON_VISION_TOTAL = ["ADMINISTRADOR", "RESPONSABLE_COMERCIAL"] as const satisfies readonly Rol[];
+
+export function veTodo(rol: Rol | undefined): boolean {
+  return rol !== undefined && (ROLES_CON_VISION_TOTAL as readonly Rol[]).includes(rol);
+}

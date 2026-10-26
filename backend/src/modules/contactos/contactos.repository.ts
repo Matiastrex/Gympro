@@ -1,18 +1,22 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "../../config/db";
 
-export function findAll(filtro?: string) {
+export function findAll({ filtro, visibilidad }: { filtro?: string; visibilidad: Prisma.ContactoWhereInput }) {
   return prisma.contacto.findMany({
-    where: filtro
-      ? {
-          OR: [
+    where: {
+      AND: visibilidad,
+      OR: filtro
+        ? [
             { nombre: { contains: filtro } },
             { apellido: { contains: filtro } },
             { email: { contains: filtro } },
-          ],
-        }
-      : undefined,
-    include: { empresa: { select: { id: true, razonSocial: true } } },
+          ]
+        : undefined,
+    },
+    include: {
+      empresa: { select: { id: true, razonSocial: true } },
+      responsable: { select: { id: true, nombre: true, apellido: true } },
+    },
     orderBy: { apellido: "asc" },
   });
 }

@@ -20,11 +20,20 @@ Implementado:
   anterior, etapa nueva, usuario, fecha y observación; se consulta desde el
   detalle de una oportunidad y desde `GET /api/oportunidades/:id/historial`.
 
-Fuera de alcance de esta entrega (planificado para la Entrega Final, ya
-contemplado en el modelo de datos y en la arquitectura para no requerir
-rediseño): gestión completa de usuarios/roles/permisos, actividades e
-historial visible en la UI, configuración de etapas desde el sistema,
-búsqueda/filtros/paginación avanzados.
+## Avance de la Entrega Final (12/11)
+
+Implementado:
+- Gestión de usuarios (alta, edición, activar/desactivar), solo para el
+  administrador.
+- Roles de administrador, responsable comercial y vendedor, con permisos
+  aplicados en la API y en la interfaz (ver [Roles y permisos](#roles-y-permisos)).
+- Asignación y reasignación de responsables en empresas, contactos y
+  oportunidades.
+
+Pendiente: gestión de productos, etapas, tipos de actividad, orígenes y
+motivos de pérdida desde el sistema; registro de actividades e historial
+comercial en la UI; reapertura autorizada de oportunidades cerradas; filtros
+y paginación.
 
 ## Adaptación al dominio (gimnasio de barrio)
 
@@ -41,6 +50,35 @@ búsqueda/filtros/paginación avanzados.
 - **Etapas del embudo** (precargadas): Consulta recibida → Clase de prueba
   agendada → Clase de prueba realizada → Propuesta de membresía enviada →
   Negociación → Inscripto (Ganada) / Perdida.
+
+## Roles y permisos
+
+| | Administrador | Responsable comercial | Vendedor |
+| :--- | :---: | :---: | :---: |
+| Gestionar usuarios y asignar roles | ✅ | — | — |
+| Ver empresas, contactos y oportunidades de todo el equipo | ✅ | ✅ | — |
+| Ver el embudo de todo el equipo | ✅ | ✅ | Solo sus oportunidades |
+| Crear y editar empresas, contactos y oportunidades | ✅ | ✅ | Solo las suyas |
+| Mover oportunidades de etapa y dar de baja | ✅ | ✅ | Solo las suyas |
+| Elegir el responsable al crear | ✅ | ✅ | Queda él mismo |
+| Asignar y reasignar responsables | ✅ | ✅ | — |
+
+Reglas de asignación:
+
+- **El vendedor trabaja sobre su cartera.** Ve y modifica solo lo que tiene
+  asignado. Lo que crea queda a su nombre y no puede pasárselo a otro. Si
+  intenta abrir, editar o mover algo ajeno, la API responde 403.
+- **El contacto acompaña a la oportunidad.** Al reasignar una oportunidad, su
+  contacto (o su empresa, si es un convenio) pasa al nuevo responsable.
+- **Quien creó un contacto o una empresa lo sigue viendo.** Si después se lo
+  reasignan a otro vendedor, le queda en su lista para consultarlo, pero
+  editarlo o darlo de baja le corresponde al responsable actual. La
+  oportunidad reasignada, en cambio, deja de verla.
+- **Siempre queda al menos un administrador activo.** Un administrador no
+  puede cambiar su propio rol ni desactivar su usuario.
+- **Los usuarios no se borran:** se desactivan y dejan de poder iniciar
+  sesión, pero conservan su historial. Desactivar a un usuario o cambiarle el
+  rol tiene efecto inmediato, aunque tenga una sesión abierta.
 
 ## Estructura del proyecto
 
@@ -84,13 +122,16 @@ npm run setup
 
 `npm run setup` ejecuta, en orden: `prisma generate` (genera el cliente
 tipado), `prisma migrate dev` (crea las tablas en tu MySQL) y el seed (carga
-el usuario de prueba, las etapas del embudo y los planes de membresía).
+los usuarios de prueba, las etapas del embudo y los planes de membresía).
 
-Si la base ya estaba creada antes de incorporar el historial completo, aplicar
-las migraciones pendientes con:
+Si ya tenías la base creada, **después de cada `git pull`** aplicá las
+migraciones nuevas y volvé a correr el seed (no duplica datos, y así se crean
+los usuarios que falten):
 
 ```bash
 npx prisma migrate deploy
+npx prisma generate
+npm run prisma:seed
 ```
 
 Para reemplazar los datos comerciales de la base local con un escenario de
@@ -100,8 +141,11 @@ prueba completo, usar:
 npm run seed:demo
 ```
 
-Este comando conserva el usuario, las etapas y los productos, pero elimina y
-recrea empresas, contactos, oportunidades e historiales comerciales.
+Este comando conserva los usuarios, las etapas y los productos, pero elimina y
+recrea empresas, contactos, oportunidades e historiales comerciales. Todos los
+datos de demo quedan asignados al administrador, así que el vendedor arranca
+con las listas vacías: para probar ese rol, reasigná algunos registros desde
+la cuenta del administrador o del responsable comercial.
 
 Usuarios de prueba creados por el seed (uno por rol, todos con la contraseña
 `gympro123`):
@@ -156,16 +200,29 @@ npm install
 npm run dev
 ```
 
-Abrir `http://localhost:5173`, iniciar sesión con el usuario de prueba y ya
-se puede recorrer el flujo completo: crear empresa/contacto → crear
-oportunidad → verla en el embudo → cambiarla de etapa → refrescar y
-comprobar que la información persiste.
+Abrir `http://localhost:5173`, iniciar sesión con cualquiera de los usuarios
+de prueba y ya se puede recorrer el flujo completo: crear empresa/contacto →
+crear oportunidad → verla en el embudo → cambiarla de etapa → refrescar y
+comprobar que la información persiste. Entrando con cada usuario se ve qué
+habilita cada rol; por ejemplo, la sección Usuarios solo aparece para el
+administrador.
+
+Si el puerto 5173 está ocupado, Vite arranca en el siguiente (5174, …) y el
+backend rechaza las peticiones por CORS. En ese caso, actualizá
+`CORS_ORIGIN` en `backend/.env` con el puerto que muestra Vite y reiniciá el
+backend.
 
 ## Notas para la Entrega Final
 
-El esquema de Prisma (`backend/prisma/schema.prisma`) ya incluye las tablas
-de `Actividad` y `HistorialEtapa`, y el campo `rol` en `Usuario`, para que
-agregar esas funcionalidades sea sumar endpoints y pantallas, no rediseñar
-la base. El middleware `requireRole` (`backend/src/middlewares/role.middleware.ts`)
-ya está listo para empezar a restringir rutas por rol cuando se implemente
-la gestión completa de usuarios.
+El esquema de Prisma (`backend/prisma/schema.prisma`) ya incluye la tabla
+`Actividad`, para que registrar actividades sea sumar endpoints y pantallas,
+no rediseñar la base.
+
+Los permisos se aplican en dos niveles:
+
+- **Por ruta:** `requireRole` (`backend/src/middlewares/role.middleware.ts`)
+  restringe una ruta entera a ciertos roles (hoy, la gestión de usuarios).
+- **Por registro:** `backend/src/utils/permisos.ts` reúne las reglas de
+  visibilidad y asignación por responsable que usan los servicios de
+  empresas, contactos y oportunidades. Cualquier módulo nuevo con
+  responsable tiene que pasar por ahí.

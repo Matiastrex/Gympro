@@ -2,6 +2,7 @@ import { z } from "zod";
 import { ApiError } from "../../utils/apiError";
 import * as empresasRepo from "./empresas.repository";
 import * as oportunidadesService from "../oportunidades/oportunidades.service";
+import { Actor, Modo, alcanceConCreador, resolverResponsable, verificarAcceso } from "../../utils/permisos";
 
 export const empresaSchema = z.object({
   razonSocial: z.string().min(1, "La razón social es obligatoria"),
@@ -24,32 +25,35 @@ export const bajaSchema = z.object({
   motivoBaja: z.string().optional(),
 });
 
-export function listar(filtro?: string) {
-  return empresasRepo.findAll(filtro);
+export function listar(actor: Actor, filtro?: string) {
+  return empresasRepo.findAll({ filtro, visibilidad: alcanceConCreador(actor) });
 }
 
-export async function obtener(id: number) {
+export async function obtener(id: number, actor: Actor, modo: Modo = "editar") {
   const empresa = await empresasRepo.findById(id);
   if (!empresa) throw ApiError.notFound("Empresa no encontrada");
+  verificarAcceso(actor, empresa, "empresa", modo);
   return empresa;
 }
 
-export function crear(data: EmpresaInput) {
-  return empresasRepo.create(data as any);
+export async function crear(data: EmpresaInput, actor: Actor) {
+  const responsableId = await resolverResponsable(actor, data.responsableId);
+  return empresasRepo.create({ ...data, responsableId, creadoPorId: actor.userId } as any);
 }
 
-export async function actualizar(id: number, data: EmpresaInput) {
-  await obtener(id);
-  return empresasRepo.update(id, data as any);
+export async function actualizar(id: number, data: EmpresaInput, actor: Actor) {
+  const empresa = await obtener(id, actor);
+  const responsableId = await resolverResponsable(actor, data.responsableId, empresa.responsableId);
+  return empresasRepo.update(id, { ...data, responsableId } as any);
 }
 
 export async function darDeBaja(
   id: number,
   contactarNuevamente: boolean,
-  usuarioId: number,
+  actor: Actor,
   motivoBaja?: string
 ) {
-  const empresa = await obtener(id);
+  const empresa = await obtener(id, actor);
   if (empresa.oportunidadAbiertaId != null) {
     throw ApiError.badRequest("No se puede dar de baja una empresa con una oportunidad abierta");
   }
@@ -62,11 +66,11 @@ export async function darDeBaja(
   if (inscripcion) {
     await oportunidadesService.cancelarInscripcion({
       oportunidadId: inscripcion.id,
-      usuarioId,
+      usuarioId: actor.userId,
       motivoBaja,
       estadoEntidad: estado,
     });
-    return obtener(id);
+    return obtener(id, actor);
   }
 
   return empresasRepo.darDeBaja(id, estado);
