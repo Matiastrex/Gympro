@@ -32,7 +32,8 @@ exist. Type-check by running the relevant `build` command.
 Requires a running MySQL instance and a `backend/.env` (copy from `.env.example`) with `DATABASE_URL`,
 `JWT_SECRET`, etc. — see `backend/src/config/env.ts` for the full list of required vars.
 
-Seeded login: `admin@gympro.com` / `gympro123`.
+Seeded logins (one per rol, all with password `gympro123`): `admin@gympro.com` (ADMINISTRADOR),
+`responsable@gympro.com` (RESPONSABLE_COMERCIAL), `vendedor@gympro.com` (VENDEDOR).
 
 ### Frontend (`cd frontend`)
 
@@ -70,9 +71,17 @@ Route handlers don't need try/catch: wrap the handler body in `asyncHandler` (`u
 and just `throw`.
 
 Auth is a JWT bearer token (`utils/jwt.ts`, `middlewares/auth.middleware.ts`) checked per-router with
-`router.use(requireAuth)`. `req.user` carries `{ userId, rol }`. `middlewares/role.middleware.ts`
-(`requireRole(...roles)`) exists and is wired for future use, but the MVP seed only creates
-`ADMINISTRADOR` users, so it doesn't currently block anything — don't remove it as dead code.
+`router.use(requireAuth)`. `requireAuth` re-reads the usuario on every request, so `req.user`
+(`{ userId, rol }`) carries the **current** rol, and a usuario with `activo: false` gets a 401 even with
+a still-valid token. Gate routes with `requireRole(...roles)` (`middlewares/role.middleware.ts`) after
+`requireAuth`; so far only the usuarios management routes use it.
+
+Usuarios (`modules/usuarios`, page `UsuariosPage.tsx`, admin-only) have no DELETE — they're deactivated
+with `activo: false`. The service rejects an admin changing their own rol or deactivating themselves,
+and any change that would leave zero active `ADMINISTRADOR`s. `GET /api/usuarios` stays open to every
+rol (it feeds the responsable selects) and returns only active usuarios; `?incluirInactivos=true` is
+honored for admins only. On the frontend, `constants/roles.ts` holds the `Rol` type and labels;
+`ProtectedRoute` accepts `roles` and the Sidebar's links can declare `roles` to hide themselves.
 
 ### Data model is ahead of the current API/UI on purpose
 
@@ -136,8 +145,8 @@ via `localStorage`). `src/api/client.ts` is a single Axios instance: it attaches
 `localStorage` on every request and force-redirects to `/login` on a 401 response. Pages
 (`src/pages/*.tsx`) call the API directly through this client — there's no separate API-hooks layer.
 
-The frontend has no routing/pages beyond empresas, contactos, oportunidades, and the embudo board,
-matching the backend's current MVP scope.
+The frontend has pages for empresas, contactos, oportunidades, the embudo board, and usuarios (admin
+only).
 
 ## Known bugs to fix
 

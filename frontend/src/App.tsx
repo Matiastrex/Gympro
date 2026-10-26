@@ -7,6 +7,7 @@ import { EmbudoPage } from "./pages/EmbudoPage";
 import { OportunidadesPage } from "./pages/OportunidadesPage";
 import { ContactosPage } from "./pages/ContactosPage";
 import { EmpresasPage } from "./pages/EmpresasPage";
+import { UsuariosPage } from "./pages/UsuariosPage";
 
 function AppLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -58,6 +59,16 @@ export default function App() {
             </AppLayout>
           }
         />
+        <Route element={<ProtectedRoute roles={["ADMINISTRADOR"]} />}>
+          <Route
+            path="/usuarios"
+            element={
+              <AppLayout>
+                <UsuariosPage />
+              </AppLayout>
+            }
+          />
+        </Route>
       </Route>
     </Routes>
   );

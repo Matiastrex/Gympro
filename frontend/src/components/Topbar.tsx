@@ -1,18 +1,14 @@
 import { useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { Avatar } from "./Avatar";
+import { ROL_LABEL } from "../constants/roles";
 
 const TITLES: Record<string, string> = {
   "/": "Embudo comercial",
   "/oportunidades": "Oportunidades",
   "/contactos": "Contactos",
   "/empresas": "Empresas",
-};
-
-const ROL_LABEL: Record<string, string> = {
-  ADMINISTRADOR: "Administrador",
-  VENDEDOR: "Vendedor",
-  RESPONSABLE_COMERCIAL: "Responsable comercial",
+  "/usuarios": "Usuarios",
 };
 
 export function Topbar() {
@@ -29,7 +25,7 @@ export function Topbar() {
             <strong>
               {usuario.nombre} {usuario.apellido}
             </strong>
-            <span>{ROL_LABEL[usuario.rol] ?? usuario.rol}</span>
+            <span>{ROL_LABEL[usuario.rol]}</span>
           </div>
           <Avatar nombre={usuario.nombre} apellido={usuario.apellido} size={36} />
         </div>

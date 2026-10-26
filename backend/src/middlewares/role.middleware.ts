@@ -2,10 +2,8 @@ import { NextFunction, Request, Response } from "express";
 import { Rol } from "@prisma/client";
 import { ApiError } from "../utils/apiError";
 
-// Preparado para la Entrega Final, donde sí se exige diferenciar
-// Administrador / Vendedor / Responsable comercial. En el MVP el único
-// usuario cargado es ADMINISTRADOR, así que este guard no bloquea nada
-// todavía, pero las rutas ya pueden empezar a declarar qué roles permiten.
+// Va siempre después de requireAuth, que deja en req.user el rol vigente
+// del usuario (releído de la base, no el que quedó guardado en el token).
 export function requireRole(...rolesPermitidos: Rol[]) {
   return (req: Request, _res: Response, next: NextFunction) => {
     if (!req.user) {

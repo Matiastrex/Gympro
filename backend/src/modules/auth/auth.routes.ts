@@ -7,7 +7,7 @@ import * as authService from "./auth.service";
 export const authRouter = Router();
 
 const loginSchema = z.object({
-  email: z.string().email(),
+  email: z.string().trim().toLowerCase().email(),
   password: z.string().min(1),
 });
 

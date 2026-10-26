@@ -177,7 +177,7 @@ export function ContactosPage() {
         </div>
       </div>
 
-      <div className="card">
+      <div className="card table-card">
         <table>
           <thead>
             <tr>

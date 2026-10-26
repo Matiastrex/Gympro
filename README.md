@@ -103,11 +103,13 @@ npm run seed:demo
 Este comando conserva el usuario, las etapas y los productos, pero elimina y
 recrea empresas, contactos, oportunidades e historiales comerciales.
 
-Usuario de prueba creado por el seed:
+Usuarios de prueba creados por el seed (uno por rol, todos con la contraseña
+`gympro123`):
 
 ```
-email:    admin@gympro.com
-password: gympro123
+admin@gympro.com         Administrador
+responsable@gympro.com   Responsable comercial
+vendedor@gympro.com      Vendedor
 ```
 
 Levantar el servidor en modo desarrollo:

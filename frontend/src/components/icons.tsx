@@ -77,6 +77,17 @@ export function PencilIcon(props: IconProps) {
   );
 }
 
+export function UsersIcon(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <circle cx="9" cy="8" r="3.5" />
+      <path d="M2.5 19.5c.6-3.4 3.2-5.5 6.5-5.5s5.9 2.1 6.5 5.5" />
+      <path d="M15.5 4.8a3.5 3.5 0 0 1 0 6.4" />
+      <path d="M17.5 14.3c2.1.6 3.6 2.4 4 5.2" />
+    </svg>
+  );
+}
+
 export function BajaIcon(props: IconProps) {
   return (
     <svg {...base} width={16} height={16} {...props}>

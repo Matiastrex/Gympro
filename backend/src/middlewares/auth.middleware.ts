@@ -1,5 +1,6 @@
-import { NextFunction, Request, Response } from "express";
+import { prisma } from "../config/db";
 import { ApiError } from "../utils/apiError";
+import { asyncHandler } from "../utils/asyncHandler";
 import { verifyToken, JwtPayload } from "../utils/jwt";
 
 declare global {
@@ -11,17 +12,29 @@ declare global {
   }
 }
 
-export function requireAuth(req: Request, _res: Response, next: NextFunction) {
+// Además de validar el token, se relee el usuario: así desactivarlo o
+// cambiarle el rol tiene efecto inmediato, sin esperar a que venza el JWT.
+export const requireAuth = asyncHandler(async (req, _res, next) => {
   const header = req.headers.authorization;
   if (!header?.startsWith("Bearer ")) {
     throw ApiError.unauthorized();
   }
 
-  const token = header.slice("Bearer ".length);
+  let payload: JwtPayload;
   try {
-    req.user = verifyToken(token);
-    next();
+    payload = verifyToken(header.slice("Bearer ".length));
   } catch {
     throw ApiError.unauthorized("Sesión inválida o expirada");
   }
-}
+
+  const usuario = await prisma.usuario.findUnique({
+    where: { id: payload.userId },
+    select: { id: true, rol: true, activo: true },
+  });
+  if (!usuario?.activo) {
+    throw ApiError.unauthorized("Tu usuario fue desactivado");
+  }
+
+  req.user = { userId: usuario.id, rol: usuario.rol };
+  next();
+});

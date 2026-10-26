@@ -157,7 +157,7 @@ export function EmbudoPage() {
   }
 
   return (
-    <div className="container">
+    <div className="container container-board">
       <div className="page-header">
         <div>
           <h2>Embudo comercial</h2>

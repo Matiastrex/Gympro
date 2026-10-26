@@ -1,4 +1,5 @@
 import { ReactNode } from "react";
+import { ROL_LABEL } from "../constants/roles";
 
 const VARIANT_BY_VALUE: Record<string, string> = {
   POTENCIAL: "badge-info",
@@ -9,6 +10,10 @@ const VARIANT_BY_VALUE: Record<string, string> = {
   GANADA: "badge-success",
   PERDIDA: "badge-danger",
   BAJA: "badge-warning",
+  ACTIVO: "badge-success",
+  ADMINISTRADOR: "badge-brand",
+  RESPONSABLE_COMERCIAL: "badge-info",
+  VENDEDOR: "badge-neutral",
 };
 
 export const ESTADO_LABEL: Record<string, string> = {
@@ -20,6 +25,8 @@ export const ESTADO_LABEL: Record<string, string> = {
   GANADA: "Ganada",
   PERDIDA: "Perdida",
   BAJA: "Inscripción cancelada",
+  ACTIVO: "Activo",
+  ...ROL_LABEL,
 };
 
 interface BadgeProps {

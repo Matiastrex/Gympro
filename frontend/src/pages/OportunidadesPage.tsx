@@ -179,7 +179,7 @@ export function OportunidadesPage() {
         </div>
       </div>
 
-      <div className="card">
+      <div className="card table-card table-wide">
         <table>
           <thead>
             <tr>

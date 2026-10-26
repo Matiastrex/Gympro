@@ -62,8 +62,11 @@ button, input, select, textarea { font-family: inherit; }
 
 /* ---------- App shell ---------- */
 
+/* Alto fijo al de la ventana: el sidebar nunca se estira y el scroll queda
+   dentro de .app-content (o del tablero, en el embudo). */
 .app-shell {
-  min-height: 100vh;
+  height: 100vh;
+  height: 100dvh;
   display: flex;
 }
 
@@ -157,7 +160,7 @@ button, input, select, textarea { font-family: inherit; }
 .topbar-user-info strong { display: block; font-size: 13px; font-weight: 600; }
 .topbar-user-info span { font-size: 12px; color: var(--ink-faint); }
 
-.app-content { flex: 1; overflow-y: auto; }
+.app-content { flex: 1; min-height: 0; overflow-y: auto; }
 
 .container { padding: 28px 32px 48px; max-width: 1180px; margin: 0 auto; width: 100%; }
 
@@ -174,7 +177,7 @@ button, input, select, textarea { font-family: inherit; }
 
 .page-header p { margin: 4px 0 0; color: var(--ink-soft); font-size: 14px; }
 
-.toolbar { display: flex; align-items: center; gap: 10px; }
+.toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 
 .search-input {
   display: flex;
@@ -205,6 +208,14 @@ button, input, select, textarea { font-family: inherit; }
 }
 
 .card-pad { padding: 22px; }
+
+/* Una tabla no se achica por debajo del ancho de su contenido: en ventanas
+   angostas scrollea dentro de la tarjeta en vez de salirse del fondo blanco. */
+.table-card { overflow-x: auto; }
+.table-card table { min-width: 760px; }
+.table-card.table-wide table { min-width: 980px; }
+.table-card th { white-space: nowrap; }
+.table-card .badge, .table-card .row-actions { white-space: nowrap; }
 
 table { width: 100%; border-collapse: collapse; }
 
@@ -243,6 +254,7 @@ tbody tr.row-empty:hover { background: transparent; }
 
 .btn {
   background: var(--brand);
+  white-space: nowrap;
   color: white;
   border: none;
   border-radius: var(--radius-sm);
@@ -319,6 +331,46 @@ tbody tr.row-empty:hover { background: transparent; }
 .form-grid label { display: flex; flex-direction: column; font-size: 13px; gap: 6px; color: var(--ink-soft); font-weight: 500; }
 .form-grid label.span-2 { grid-column: 1 / -1; }
 
+/* Selector de rol: misma tarjeta con radio que .baja-opcion, en tres columnas.
+   Los selectores llevan .rol-picker delante para ganarle a .form-grid label. */
+.rol-picker {
+  grid-column: 1 / -1;
+  border: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+.rol-picker legend { padding: 0; margin-bottom: 6px; font-size: 13px; font-weight: 500; color: var(--ink-soft); }
+.rol-picker .rol-opcion {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-content: start;
+  gap: 4px 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  color: var(--ink);
+}
+.rol-picker .rol-opcion:has(input:checked) { border-color: var(--brand); background: var(--brand-wash); }
+.rol-picker .rol-opcion input { margin: 2px 0 0; padding: 0; }
+.rol-picker .rol-opcion strong { font-size: 14px; }
+.rol-picker .rol-opcion small { grid-column: 2; color: var(--ink-soft); font-size: 12.5px; line-height: 1.4; font-weight: 400; }
+.rol-picker:disabled .rol-opcion { cursor: not-allowed; opacity: 0.6; }
+
+.filter-select {
+  border-radius: var(--radius-pill);
+  padding: 8px 14px;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.cell-user { display: flex; align-items: center; gap: 10px; }
+tbody tr.row-inactiva td { color: var(--ink-faint); }
+tbody tr.row-inactiva .cell-primary { color: var(--ink-soft); }
+
 input, select, textarea {
   padding: 9px 11px;
   border: 1px solid var(--line);
@@ -357,6 +409,7 @@ textarea { resize: vertical; min-height: 70px; font-family: inherit; }
 .badge-danger { background: var(--danger-wash); color: var(--danger); }
 .badge-warning { background: var(--warning-wash); color: var(--warning); }
 .badge-neutral { background: var(--neutral-wash); color: var(--ink-soft); }
+.badge-brand { background: var(--brand-wash); color: var(--brand-ink); }
 
 /* ---------- Avatar ---------- */
 
@@ -457,16 +510,25 @@ textarea { resize: vertical; min-height: 70px; font-family: inherit; }
 
 /* ---------- Kanban board ---------- */
 
+/* En el embudo la página ocupa todo el alto disponible y el tablero toma el
+   espacio que queda bajo el encabezado: cuando las tarjetas no entran,
+   scrollea solo el tablero (en ambos ejes) y el encabezado queda fijo. */
+.container-board {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  padding-bottom: 20px;
+}
+
 .board {
   display: flex;
   gap: 16px;
-  overflow-x: auto;
-  padding: 4px 2px 24px;
-  align-items: stretch;
-  /* El tablero arranca ocupando la mitad de la altura del dashboard (viewport
-     menos el topbar y el encabezado de la página) y crece desde ahí a medida
-     que las columnas se llenan de oportunidades — nunca se recorta. */
-  min-height: calc(50vh - 80px);
+  overflow: auto;
+  padding: 4px 2px 12px;
+  align-items: flex-start;
+  flex: 1;
+  min-height: 320px;
+  overscroll-behavior: contain;
 }
 
 .board-column {
@@ -475,6 +537,7 @@ textarea { resize: vertical; min-height: 70px; font-family: inherit; }
   border-radius: var(--radius-lg);
   min-width: 288px;
   flex: 0 0 288px;
+  min-height: 100%;
   padding: 14px;
   display: flex;
   flex-direction: column;
@@ -721,8 +784,10 @@ textarea { resize: vertical; min-height: 70px; font-family: inherit; }
 @media (max-width: 720px) {
   .container { padding: 20px 16px 40px; }
   .form-grid { grid-template-columns: 1fr; }
+  .rol-picker { grid-template-columns: 1fr; }
   .detail-grid { grid-template-columns: 1fr; }
   .topbar { padding: 0 16px; }
   .topbar-user-info { display: none; }
   .search-input { min-width: 0; }
+  th, td { padding: 12px 14px; }
 }

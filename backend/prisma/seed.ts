@@ -4,19 +4,21 @@ import bcrypt from "bcryptjs";
 const prisma = new PrismaClient();
 
 async function main() {
-  // ---------- Usuario habilitado (requisito del MVP) ----------
+  // ---------- Un usuario por rol (misma contraseña para las pruebas) ----------
   const passwordHash = await bcrypt.hash("gympro123", 10);
-  await prisma.usuario.upsert({
-    where: { email: "admin@gympro.com" },
-    update: {},
-    create: {
-      nombre: "Admin",
-      apellido: "GymPro",
-      email: "admin@gympro.com",
-      passwordHash,
-      rol: "ADMINISTRADOR",
-    },
-  });
+  const usuarios = [
+    { nombre: "Admin", apellido: "GymPro", email: "admin@gympro.com", rol: "ADMINISTRADOR" as const },
+    { nombre: "Laura", apellido: "Medina", email: "responsable@gympro.com", rol: "RESPONSABLE_COMERCIAL" as const },
+    { nombre: "Tomás", apellido: "Ríos", email: "vendedor@gympro.com", rol: "VENDEDOR" as const },
+  ];
+
+  for (const usuario of usuarios) {
+    await prisma.usuario.upsert({
+      where: { email: usuario.email },
+      update: {},
+      create: { ...usuario, passwordHash },
+    });
+  }
 
   // ---------- Etapas del embudo, adaptadas a un gimnasio de barrio ----------
   const etapas = [
@@ -62,7 +64,9 @@ async function main() {
     }
   }
 
-  console.log("Seed completado. Usuario de prueba: admin@gympro.com / gympro123");
+  console.log(
+    "Seed completado. Usuarios de prueba (contraseña gympro123): " + usuarios.map((u) => u.email).join(", ")
+  );
 }
 
 main()

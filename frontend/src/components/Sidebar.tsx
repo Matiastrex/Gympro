@@ -1,17 +1,29 @@
 import { NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { FunnelIcon, DealIcon, PersonIcon, BuildingIcon, LogoutIcon } from "./icons";
+import { Rol } from "../constants/roles";
+import { FunnelIcon, DealIcon, PersonIcon, BuildingIcon, UsersIcon, LogoutIcon } from "./icons";
 
-const links = [
+interface SidebarLink {
+  to: string;
+  label: string;
+  icon: (props: React.SVGProps<SVGSVGElement>) => JSX.Element;
+  end: boolean;
+  // Sin roles: lo ve cualquier usuario logueado.
+  roles?: readonly Rol[];
+}
+
+const links: SidebarLink[] = [
   { to: "/", label: "Embudo", icon: FunnelIcon, end: true },
   { to: "/oportunidades", label: "Oportunidades", icon: DealIcon, end: false },
   { to: "/contactos", label: "Contactos", icon: PersonIcon, end: false },
   { to: "/empresas", label: "Empresas", icon: BuildingIcon, end: false },
+  { to: "/usuarios", label: "Usuarios", icon: UsersIcon, end: false, roles: ["ADMINISTRADOR"] },
 ];
 
 export function Sidebar() {
-  const { logout } = useAuth();
+  const { usuario, logout } = useAuth();
   const navigate = useNavigate();
+  const visibles = links.filter((link) => !link.roles || (usuario && link.roles.includes(usuario.rol)));
 
   function handleLogout() {
     logout();
@@ -22,7 +34,7 @@ export function Sidebar() {
     <aside className="sidebar">
       <div className="sidebar-logo">GP</div>
       <nav className="sidebar-nav">
-        {links.map(({ to, label, icon: Icon, end }) => (
+        {visibles.map(({ to, label, icon: Icon, end }) => (
           <NavLink
             key={to}
             to={to}

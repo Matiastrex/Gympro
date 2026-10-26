@@ -1,12 +1,13 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
 import { api } from "../api/client";
+import { Rol } from "../constants/roles";
 
 interface Usuario {
   id: number;
   nombre: string;
   apellido: string;
   email: string;
-  rol: string;
+  rol: Rol;
 }
 
 interface AuthContextValue {
