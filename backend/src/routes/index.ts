@@ -7,6 +7,9 @@ import { productosRouter } from "../modules/productos/productos.routes";
 import { etapasRouter } from "../modules/etapas/etapas.routes";
 import { oportunidadesRouter } from "../modules/oportunidades/oportunidades.routes";
 import { embudoRouter } from "../modules/embudo/embudo.routes";
+import { notificacionesRouter } from "../modules/notificaciones/notificaciones.routes";
+import { reaperturasRouter } from "../modules/reaperturas/reaperturas.routes";
+import { dashboardRouter } from "../modules/dashboard/dashboard.routes";
 import { actividadesRouter, tiposActividadRouter } from "../modules/actividades/actividades.routes";
 
 export const apiRouter = Router();
@@ -21,3 +24,6 @@ apiRouter.use("/oportunidades", oportunidadesRouter);
 apiRouter.use("/embudo", embudoRouter);
 apiRouter.use("/actividades", actividadesRouter);
 apiRouter.use("/tipos-actividad", tiposActividadRouter);
+apiRouter.use("/notificaciones", notificacionesRouter);
+apiRouter.use("/reaperturas", reaperturasRouter);
+apiRouter.use("/dashboard", dashboardRouter);

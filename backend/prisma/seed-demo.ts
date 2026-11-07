@@ -22,6 +22,8 @@ async function main() {
   };
 
   await prisma.$transaction(async (tx) => {
+    await tx.notificacion.deleteMany();
+    await tx.solicitudReapertura.deleteMany();
     await tx.historialEtapa.deleteMany();
     await tx.actividad.deleteMany();
     await tx.oportunidad.deleteMany();

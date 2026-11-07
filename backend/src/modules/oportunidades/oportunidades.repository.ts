@@ -33,6 +33,12 @@ export function findById(id: number) {
         },
         orderBy: { fecha: "desc" },
       },
+      // Para que el detalle muestre "reapertura pendiente" y no deje pedir otra.
+      solicitudesReapertura: {
+        where: { estado: "PENDIENTE" },
+        select: { id: true, createdAt: true, etapaDestino: { select: { nombre: true } }, solicitante: { select: { nombre: true, apellido: true } } },
+        take: 1,
+      },
     },
   });
 }

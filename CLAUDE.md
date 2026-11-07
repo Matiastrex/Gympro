@@ -23,14 +23,21 @@ npm start                # run compiled dist/server.js
 npm run setup            # prisma generate && prisma migrate dev && seed (first-time DB setup)
 npm run prisma:generate  # regenerate Prisma client after editing schema.prisma
 npm run prisma:migrate   # create/apply a migration (prompts for a name unless --name is passed)
-npm run prisma:seed      # re-run prisma/seed.ts (test user, etapas, productos)
+npm run prisma:seed      # re-run prisma/seed.ts (users, etapas, productos, tipos de actividad)
+npm run seed:demo        # WIPES oportunidades/contactos/empresas/actividades and loads demo data
 ```
 
 There is no lint or test script configured in either project — do not assume `npm test`/`npm run lint`
 exist. Type-check by running the relevant `build` command.
 
 Requires a running MySQL instance and a `backend/.env` (copy from `.env.example`) with `DATABASE_URL`,
-`JWT_SECRET`, etc. — see `backend/src/config/env.ts` for the full list of required vars.
+`JWT_SECRET`, etc. — see `backend/src/config/env.ts` for the full list of required vars. The team also
+shares a MySQL on Azure (commented-out `DATABASE_URL` in `.env.example`): after pulling a branch with
+new migrations, run `npm run prisma:migrate` (and `prisma:seed` if it adds catalogs) against whichever DB
+you use. Write migrations that touch existing rows by hand (see `add_actividades`) so shared data isn't lost.
+
+Stop dev servers you started before handing back: a leftover `npm run dev` keeps port 4000 busy
+(`EADDRINUSE`) and pushes Vite to 5174, which breaks CORS.
 
 Seeded logins (one per rol, all with password `gympro123`): `admin@gympro.com` (ADMINISTRADOR),
 `responsable@gympro.com` (RESPONSABLE_COMERCIAL), `vendedor@gympro.com` (VENDEDOR).
@@ -74,7 +81,7 @@ Auth is a JWT bearer token (`utils/jwt.ts`, `middlewares/auth.middleware.ts`) ch
 `router.use(requireAuth)`. `requireAuth` re-reads the usuario on every request, so `req.user`
 (`{ userId, rol }`) carries the **current** rol, and a usuario with `activo: false` gets a 401 even with
 a still-valid token. Gate whole routes with `requireRole(...roles)` (`middlewares/role.middleware.ts`)
-after `requireAuth`; so far only the usuarios management routes use it.
+after `requireAuth`; the usuarios management routes and approving/rejecting reaperturas use it.
 
 Per-record permissions live in `utils/permisos.ts`, and services receive the `actor` (`req.user!`):
 - ADMINISTRADOR and RESPONSABLE_COMERCIAL (`veTodo`) see everything and can assign/reassign
@@ -122,6 +129,58 @@ only `POST /api/actividades` and reads, no PUT/DELETE. Rules in `actividades.ser
   (used in the contacto, empresa, oportunidad and embudo detail modals) and `ActividadForm.tsx`; shared
   types in `src/types/actividades.ts`.
 
+Reapertura of a lost oportunidad (`modules/reaperturas`) is the only way back from a closed estado:
+- Only `estado: PERDIDA` can be reopened (Inscripto and Inscripción cancelada can't), into an etapa with
+  `tipo: ABIERTA` that the requester picks (the UI defaults to the etapa it was lost from), with a
+  mandatory `motivo`. Same guards as creating one: the contacto/empresa can't be `CLIENTE` or already have
+  another `oportunidadAbiertaId`, and `bajaDefinitiva` blocks clase de prueba etapas. They're re-checked
+  on approval because things may have changed in between.
+- `POST /api/oportunidades/:id/reapertura`: a VENDEDOR (own oportunidades) or RESPONSABLE_COMERCIAL
+  creates a `SolicitudReapertura` (`PENDIENTE`) and a notification for every active admin. An
+  ADMINISTRADOR calling it reopens directly (they're the authorizer). One `PENDIENTE` per oportunidad.
+- `POST /api/reaperturas/:id/aprobar` / `rechazar` (`{ comentario }`, mandatory) are admin-only.
+  `resolver()` moves the solicitud out of `PENDIENTE` with a conditional `updateMany`, so a double click
+  or a second admin gets "ya fue resuelta" instead of reopening twice. `GET /api/reaperturas?estado=`:
+  admins see all, others only their own.
+- `reaperturasRepo.reabrir` is one transaction: oportunidad → destino etapa, `estado: ABIERTA`,
+  `fechaRealCierre` and `motivoPerdida` → null; contacto/empresa → `POTENCIAL` with this oportunidad as
+  `oportunidadAbiertaId` (an empresa's contactos follow it); a `HistorialEtapa` row authored by the admin
+  ("Reabierta con autorización de X. Pedido por Y: motivo"); solicitud → `APROBADA`; notification to the
+  requester. `cambiarEtapa`'s "ya está cerrada" guard is unchanged — don't add reopen logic there.
+- Frontend: `components/Reapertura.tsx` renders the callout and modal in the oportunidad and embudo
+  detail modals when `estado === "PERDIDA"`. On the embudo board, dragging a lost card onto an open
+  column (or using its "Reabrir en..." select) opens `ReaperturaModal` with that etapa preselected,
+  instead of calling `cambiar-etapa`. `handleMover` in `EmbudoPage.tsx` routes any move of a closed
+  card: lost → open etapa goes to reapertura, Inscripto → Inscripción cancelada goes to the baja modal,
+  and anything else shows an error. `oportunidadesRepo.findById` includes the pending
+  `solicitudesReapertura` so the detail shows "Reapertura pendiente".
+
+Notificaciones (`modules/notificaciones`, page `NotificacionesPage.tsx`) are a per-user inbox. Each user
+only reads or marks their own; the queries filter by `usuarioId` and marking someone else's returns 404.
+They're always created inside the transaction that causes them (`notificacionesRepo.crearMuchas(tx, …)`),
+never on their own. `tipo` (`REAPERTURA_SOLICITADA | _APROBADA | _RECHAZADA`) discriminates the
+frontend union in `src/types/notificaciones.ts`. Endpoints: `GET /api/notificaciones?soloNoLeidas=`
+(paginated), `GET /no-leidas` → `{ total }`, `POST /:id/leer`, `POST /leer-todas`. The Topbar bell polls
+`/no-leidas` every 60 s and on window focus, and refreshes right away when a page dispatches the
+`EVENTO_NOTIFICACIONES` window event (exported from `Topbar.tsx`). Admins approve or reject from the
+notification itself.
+
+Dashboard (`modules/dashboard`, `GET /api/dashboard?desde=&hasta=&usuarioId=&rol=`, page
+`DashboardPage.tsx` at `/`) is the first screen for every rol:
+- Scope (`resolverAlcance`): VENDEDOR **and RESPONSABLE_COMERCIAL** always get only their own numbers, and
+  the filters are ignored. This differs from the rest of the CRM, where the responsable comercial sees
+  the whole team. ADMINISTRADOR gets the whole team, a rol (`VENDEDOR | RESPONSABLE_COMERCIAL`) or one
+  `usuarioId`. Oportunidades count for their `responsableId`; actividades for the `usuarioId` who
+  logged them.
+- Metrics: open oportunidades and their `valorEstimado` (now, not by period); inscriptos = `estado
+  GANADA | BAJA` (a cancelled inscription was still won) and perdidas, by `fechaRealCierre` in the period;
+  conversion = inscriptos / (inscriptos + perdidas); open oportunidades per `ABIERTA` etapa; top 6
+  `motivoPerdida` + "Otros"; actividades per tipo; a monthly inscriptos vs. perdidas series; pending
+  reaperturas (admin only). The default period is the last 6 months.
+- Charts use `recharts`, lazy-loaded in `App.tsx` so the rest of the bundle stays small. Series colors are
+  `--info` (inscriptos) and `--brand` (perdidas / single-series bars), a pair that passed the dataviz
+  palette validator.
+
 ### Data model is ahead of the current API/UI on purpose
 
 `backend/prisma/schema.prisma` already models the full domain the final delivery ("Entrega Final")
@@ -136,8 +195,8 @@ Key domain rules enforced in the service layer (see `oportunidades.service.ts`):
   same Prisma transaction — stage changes and their audit trail must never be split.
 - Moving into an `Etapa` whose `tipo` is `GANADA`/`PERDIDA` auto-derives `estado` and
   `fechaRealCierre` on the oportunidad; moving to `PERDIDA` additionally requires `motivoPerdida`.
-- Once an oportunidad's `estado` isn't `ABIERTA`, further stage changes are rejected outright (no
-  reopen flow yet — planned for the final delivery, gated by an authorization step). The one
+- Once an oportunidad's `estado` isn't `ABIERTA`, `cambiarEtapa` rejects further stage changes. A
+  `PERDIDA` one can only come back through the authorized reapertura flow (see above). The one other
   exception is Inscripto (`GANADA`) → "Inscripción cancelada" (`tipo: BAJA`), which is only reachable
   from Inscripto and is itself terminal. It sets `estado: BAJA`, `fechaBaja` and `motivoBaja` (without
   touching `fechaRealCierre`), leaves the contacto/empresa `INACTIVO` by default, and marks their
@@ -184,8 +243,9 @@ via `localStorage`). `src/api/client.ts` is a single Axios instance: it attaches
 `localStorage` on every request and force-redirects to `/login` on a 401 response. Pages
 (`src/pages/*.tsx`) call the API directly through this client — there's no separate API-hooks layer.
 
-The frontend has pages for empresas, contactos, oportunidades, the embudo board, actividades, and
-usuarios (admin only).
+Routes: `/` is the Dashboard (landing page after login for every rol), `/embudo` is the board (it used to
+live at `/`), plus `/oportunidades`, `/contactos`, `/empresas`, `/actividades`, `/notificaciones`, and
+`/usuarios` (admin only). Add new routes to both `App.tsx` and the `TITLES` map in `Topbar.tsx`.
 
 ## Known bugs to fix
 

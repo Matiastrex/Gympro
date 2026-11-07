@@ -201,3 +201,32 @@ export function PuntoIcon(props: IconProps) {
     </svg>
   );
 }
+
+export function BellIcon(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M6 16.5V11a6 6 0 1 1 12 0v5.5l1.5 2h-15Z" />
+      <path d="M10 20.5a2 2 0 0 0 4 0" />
+    </svg>
+  );
+}
+
+export function DashboardIcon(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M4 20h16" />
+      <rect x="5.5" y="11" width="3" height="6.5" rx="1" />
+      <rect x="10.5" y="5.5" width="3" height="12" rx="1" />
+      <rect x="15.5" y="8.5" width="3" height="9" rx="1" />
+    </svg>
+  );
+}
+
+export function ReabrirIcon(props: IconProps) {
+  return (
+    <svg {...base} width={16} height={16} {...props}>
+      <path d="M4.5 12a7.5 7.5 0 1 0 2.2-5.3" />
+      <path d="M4.5 4.5v4h4" />
+    </svg>
+  );
+}

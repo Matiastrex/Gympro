@@ -3,6 +3,7 @@ import { z } from "zod";
 import { asyncHandler } from "../../utils/asyncHandler";
 import { requireAuth } from "../../middlewares/auth.middleware";
 import * as oportunidadesService from "./oportunidades.service";
+import * as reaperturasService from "../reaperturas/reaperturas.service";
 
 export const oportunidadesRouter = Router();
 oportunidadesRouter.use(requireAuth);
@@ -64,5 +65,15 @@ oportunidadesRouter.post(
       ...body,
     });
     res.json(oportunidad);
+  })
+);
+
+// Pedido de reapertura de una oportunidad perdida (el admin la reabre directo).
+oportunidadesRouter.post(
+  "/:id/reapertura",
+  asyncHandler(async (req, res) => {
+    const data = reaperturasService.solicitudSchema.parse(req.body);
+    const resultado = await reaperturasService.solicitar(Number(req.params.id), data, req.user!);
+    res.status(resultado.reabierta ? 200 : 201).json(resultado);
   })
 );

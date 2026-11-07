@@ -4,6 +4,8 @@ import { Modal } from "../components/Modal";
 import { Avatar } from "../components/Avatar";
 import { Badge } from "../components/Badge";
 import { HistorialComercial } from "../components/HistorialComercial";
+import { Reapertura, ReaperturaModal, ReaperturaPendiente } from "../components/Reapertura";
+import { useAuth } from "../context/AuthContext";
 
 interface Etapa {
   id: number;
@@ -33,6 +35,7 @@ interface Columna {
 }
 
 interface OportunidadDetalle extends Oportunidad {
+  solicitudesReapertura?: ReaperturaPendiente[];
   etapa: { nombre: string };
   producto?: { nombre: string } | null;
   observaciones?: string | null;
@@ -40,7 +43,10 @@ interface OportunidadDetalle extends Oportunidad {
 
 export function EmbudoPage() {
   const [columnas, setColumnas] = useState<Columna[]>([]);
+  const { usuario } = useAuth();
   const [error, setError] = useState<string | null>(null);
+  const [aviso, setAviso] = useState<string | null>(null);
+  const [reabriendo, setReabriendo] = useState<{ oportunidad: Oportunidad; etapaId: number } | null>(null);
   const [detalle, setDetalle] = useState<OportunidadDetalle | null>(null);
   const [perdida, setPerdida] = useState<{ oportunidadId: number; etapaNuevaId: number } | null>(null);
   const [motivo, setMotivo] = useState("");
@@ -75,6 +81,26 @@ export function EmbudoPage() {
   }
 
   function handleMover(oportunidadId: number, etapaNuevaId: number, etapaTipo: string) {
+    setAviso(null);
+    const oportunidad = columnas.flatMap((c) => c.oportunidades).find((o) => o.id === oportunidadId);
+    // Una cerrada no se mueve con cambiar-etapa: una perdida que vuelve a una etapa
+    // abierta pasa por el pedido de reapertura (lo aprueba un admin).
+    if (oportunidad && oportunidad.estado !== "ABIERTA") {
+      if (oportunidad.estado === "PERDIDA" && etapaTipo === "ABIERTA") {
+        setError(null);
+        setReabriendo({ oportunidad, etapaId: etapaNuevaId });
+      } else if (!(oportunidad.estado === "GANADA" && etapaTipo === "BAJA")) {
+        setError(
+          oportunidad.estado === "PERDIDA"
+            ? "Una oportunidad perdida solo puede volver a una etapa abierta, con un pedido de reapertura."
+            : "Esta oportunidad ya está cerrada y no puede cambiar de etapa."
+        );
+      } else {
+        setBaja({ oportunidadId, etapaNuevaId });
+        setMotivoBaja("");
+      }
+      return;
+    }
     if (etapaTipo === "PERDIDA") {
       setMotivo("");
       setPerdida({ oportunidadId, etapaNuevaId });
@@ -105,6 +131,10 @@ export function EmbudoPage() {
   async function abrirDetalle(id: number) {
     const res = await api.get(`/oportunidades/${id}`);
     setDetalle(res.data);
+  }
+
+  async function recargarTrasReapertura(id: number) {
+    await Promise.all([cargar(), abrirDetalle(id)]);
   }
 
   function handleDragStart(e: React.DragEvent, oportunidadId: number) {
@@ -165,6 +195,7 @@ export function EmbudoPage() {
       </div>
 
       {error && <div className="error-box">{error}</div>}
+      {aviso && <div className="info-box">{aviso}</div>}
 
       <div className="board">
         {columnas.map(({ etapa, oportunidades }) => {
@@ -238,6 +269,29 @@ export function EmbudoPage() {
                               .filter((c) => c.etapa.id !== etapa.id && c.etapa.tipo !== "BAJA")
                               .map((c) => (
                                 <option key={c.etapa.id} value={`${c.etapa.id}|${c.etapa.tipo}`}>
+                                  {c.etapa.nombre}
+                                </option>
+                              ))}
+                          </select>
+                        ) : o.estado === "PERDIDA" ? (
+                          <select
+                            className="opp-card-move"
+                            defaultValue=""
+                            aria-label="Pedir reapertura"
+                            draggable={false}
+                            onDragStart={(e) => e.stopPropagation()}
+                            onClick={(e) => e.stopPropagation()}
+                            onChange={(e) => {
+                              const id = Number(e.target.value);
+                              if (id) handleMover(o.id, id, "ABIERTA");
+                              e.target.value = "";
+                            }}
+                          >
+                            <option value="">Reabrir en...</option>
+                            {columnas
+                              .filter((c) => c.etapa.tipo === "ABIERTA")
+                              .map((c) => (
+                                <option key={c.etapa.id} value={c.etapa.id}>
                                   {c.etapa.nombre}
                                 </option>
                               ))}
@@ -316,6 +370,24 @@ export function EmbudoPage() {
         </Modal>
       )}
 
+      {reabriendo && (
+        <ReaperturaModal
+          oportunidad={reabriendo.oportunidad}
+          esAdmin={usuario?.rol === "ADMINISTRADOR"}
+          etapaInicialId={reabriendo.etapaId}
+          onClose={() => setReabriendo(null)}
+          onEnviada={async (reabierta) => {
+            setReabriendo(null);
+            setAviso(
+              reabierta
+                ? "Oportunidad reabierta."
+                : "Pedido de reapertura enviado. Cuando un administrador lo apruebe, la tarjeta vuelve a esa etapa."
+            );
+            await cargar();
+          }}
+        />
+      )}
+
       {detalle && (
         <Modal title={detalle.titulo} onClose={() => setDetalle(null)} width={640}>
           <dl className="detail-grid">
@@ -352,7 +424,13 @@ export function EmbudoPage() {
               <p>{detalle.observaciones}</p>
             </div>
           )}
-          <HistorialComercial entidad={{ oportunidadId: detalle.id }} nombreEntidad={detalle.titulo} />
+          <Reapertura oportunidad={detalle} onCambio={() => recargarTrasReapertura(detalle.id)} />
+          <HistorialComercial
+            // Al reabrirla cambia la etapa: se vuelve a pedir el historial.
+            key={`${detalle.estado}-${detalle.etapa.nombre}`}
+            entidad={{ oportunidadId: detalle.id }}
+            nombreEntidad={detalle.titulo}
+          />
         </Modal>
       )}
     </div>

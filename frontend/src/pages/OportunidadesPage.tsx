@@ -5,6 +5,7 @@ import { Badge } from "../components/Badge";
 import { Avatar } from "../components/Avatar";
 import { PencilIcon, SearchIcon } from "../components/icons";
 import { HistorialComercial } from "../components/HistorialComercial";
+import { Reapertura, ReaperturaPendiente } from "../components/Reapertura";
 import { ResponsableSelect } from "../components/ResponsableSelect";
 
 interface Opcion {
@@ -36,6 +37,7 @@ interface Oportunidad {
 }
 
 interface OportunidadDetalle extends Oportunidad {
+  solicitudesReapertura?: ReaperturaPendiente[];
 }
 
 // Un vendedor solo recibe sus propios contactos/empresas. Si se le reasignó
@@ -123,6 +125,10 @@ export function OportunidadesPage() {
   async function abrirDetalle(id: number) {
     const res = await api.get(`/oportunidades/${id}`);
     setDetalle(res.data);
+  }
+
+  async function recargarTrasReapertura(id: number) {
+    await Promise.all([cargar(), abrirDetalle(id)]);
   }
 
   async function handleSubmit(e: FormEvent) {
@@ -377,7 +383,13 @@ export function OportunidadesPage() {
               <p>{detalle.observaciones}</p>
             </div>
           )}
-          <HistorialComercial entidad={{ oportunidadId: detalle.id }} nombreEntidad={detalle.titulo} />
+          <Reapertura oportunidad={detalle} onCambio={() => recargarTrasReapertura(detalle.id)} />
+          <HistorialComercial
+            // Al reabrirla cambia la etapa: se vuelve a pedir el historial.
+            key={`${detalle.estado}-${detalle.etapa.nombre}`}
+            entidad={{ oportunidadId: detalle.id }}
+            nombreEntidad={detalle.titulo}
+          />
         </Modal>
       )}
     </div>

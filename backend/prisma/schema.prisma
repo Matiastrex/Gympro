@@ -34,6 +34,18 @@ enum TipoEtapa {
   BAJA
 }
 
+enum EstadoSolicitud {
+  PENDIENTE
+  APROBADA
+  RECHAZADA
+}
+
+enum TipoNotificacion {
+  REAPERTURA_SOLICITADA
+  REAPERTURA_APROBADA
+  REAPERTURA_RECHAZADA
+}
+
 enum EstadoOportunidad {
   ABIERTA
   GANADA
@@ -61,6 +73,9 @@ model Usuario {
   oportunidades         Oportunidad[]    @relation("ResponsableOportunidad")
   actividades           Actividad[]
   cambiosDeEtapa        HistorialEtapa[]
+  reaperturasPedidas    SolicitudReapertura[] @relation("SolicitanteReapertura")
+  reaperturasResueltas  SolicitudReapertura[] @relation("ResolutorReapertura")
+  notificaciones        Notificacion[]
 
   @@map("usuarios")
 }
@@ -163,6 +178,7 @@ model Etapa {
   oportunidades   Oportunidad[]
   historialComoAnterior HistorialEtapa[] @relation("EtapaAnterior")
   historialComoNueva HistorialEtapa[] @relation("EtapaNueva")
+  reaperturasHacia   SolicitudReapertura[]
 
   @@map("etapas")
 }
@@ -199,8 +215,10 @@ model Oportunidad {
   motivoBaja          String?
   observaciones       String?            @db.Text
 
-  actividades     Actividad[]
-  historialEtapas HistorialEtapa[]
+  actividades           Actividad[]
+  historialEtapas       HistorialEtapa[]
+  solicitudesReapertura SolicitudReapertura[]
+  notificaciones        Notificacion[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -274,4 +292,61 @@ model HistorialEtapa {
   observacion String?
 
   @@map("historial_etapas")
+}
+
+// ---------- Reapertura autorizada de oportunidades perdidas ----------
+// Un vendedor o responsable comercial pide reabrir una oportunidad Perdida y
+// un administrador la aprueba (se reabre en la etapa pedida) o la rechaza.
+
+model SolicitudReapertura {
+  id Int @id @default(autoincrement())
+
+  oportunidadId Int
+  oportunidad   Oportunidad @relation(fields: [oportunidadId], references: [id])
+
+  etapaDestinoId Int
+  etapaDestino   Etapa @relation(fields: [etapaDestinoId], references: [id])
+
+  solicitanteId Int
+  solicitante   Usuario @relation("SolicitanteReapertura", fields: [solicitanteId], references: [id])
+
+  motivo String          @db.Text
+  estado EstadoSolicitud @default(PENDIENTE)
+
+  resueltaPorId        Int?
+  resueltaPor          Usuario?  @relation("ResolutorReapertura", fields: [resueltaPorId], references: [id])
+  resueltaEn           DateTime?
+  comentarioResolucion String?   @db.Text
+
+  notificaciones Notificacion[]
+
+  createdAt DateTime @default(now())
+
+  @@index([estado])
+  @@map("solicitudes_reapertura")
+}
+
+// ---------- Notificaciones (bandeja de cada usuario) ----------
+
+model Notificacion {
+  id Int @id @default(autoincrement())
+
+  // Destinatario: cada usuario solo ve las suyas.
+  usuarioId Int
+  usuario   Usuario @relation(fields: [usuarioId], references: [id])
+
+  tipo    TipoNotificacion
+  mensaje String           @db.Text
+  leida   Boolean          @default(false)
+
+  solicitudId Int?
+  solicitud   SolicitudReapertura? @relation(fields: [solicitudId], references: [id])
+
+  oportunidadId Int?
+  oportunidad   Oportunidad? @relation(fields: [oportunidadId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@index([usuarioId, leida])
+  @@map("notificaciones")
 }

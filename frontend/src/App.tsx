@@ -1,3 +1,4 @@
+import { lazy, Suspense } from "react";
 import { Routes, Route } from "react-router-dom";
 import { ProtectedRoute } from "./routes/ProtectedRoute";
 import { Sidebar } from "./components/Sidebar";
@@ -9,6 +10,10 @@ import { ContactosPage } from "./pages/ContactosPage";
 import { EmpresasPage } from "./pages/EmpresasPage";
 import { UsuariosPage } from "./pages/UsuariosPage";
 import { ActividadesPage } from "./pages/ActividadesPage";
+import { NotificacionesPage } from "./pages/NotificacionesPage";
+
+// recharts pesa: el dashboard se baja aparte para no agrandar el bundle del resto de la app.
+const DashboardPage = lazy(() => import("./pages/DashboardPage").then((m) => ({ default: m.DashboardPage })));
 
 function AppLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -32,7 +37,25 @@ export default function App() {
           path="/"
           element={
             <AppLayout>
+              <Suspense fallback={<div className="container cell-muted">Cargando métricas…</div>}>
+                <DashboardPage />
+              </Suspense>
+            </AppLayout>
+          }
+        />
+        <Route
+          path="/embudo"
+          element={
+            <AppLayout>
               <EmbudoPage />
+            </AppLayout>
+          }
+        />
+        <Route
+          path="/notificaciones"
+          element={
+            <AppLayout>
+              <NotificacionesPage />
             </AppLayout>
           }
         />
