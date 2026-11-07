@@ -80,6 +80,20 @@ async function main() {
   }
   await prisma.tipoActividad.upsert({ where: { nombre: "Otro" }, update: {}, create: { nombre: "Otro", orden: 99 } });
 
+  // ---------- Catálogos de orígenes y motivos de pérdida (configurables) ----------
+  const catalogos = {
+    origen: ["Instagram", "Facebook", "Sitio web", "Recomendación", "Pasó por el gimnasio", "Volante / cartel", "Convenio corporativo"],
+    motivoPerdida: ["Precio", "Horarios", "Eligió otro gimnasio", "Distancia / se mudó", "Falta de tiempo", "No respondió más", "Salud"],
+  };
+  for (const [i, nombre] of [...catalogos.origen, "Otro"].entries()) {
+    const orden = nombre === "Otro" ? 99 : i + 1;
+    await prisma.origen.upsert({ where: { nombre }, update: {}, create: { nombre, orden } });
+  }
+  for (const [i, nombre] of [...catalogos.motivoPerdida, "Otro"].entries()) {
+    const orden = nombre === "Otro" ? 99 : i + 1;
+    await prisma.motivoPerdida.upsert({ where: { nombre }, update: {}, create: { nombre, orden } });
+  }
+
   console.log(
     "Seed completado. Usuarios de prueba (contraseña gympro123): " + usuarios.map((u) => u.email).join(", ")
   );

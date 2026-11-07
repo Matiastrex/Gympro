@@ -66,7 +66,7 @@ export function ActividadesPage() {
   const [recarga, setRecarga] = useState(0);
 
   useEffect(() => {
-    api.get<TipoActividad[]>("/tipos-actividad").then((res) => setTipos(res.data));
+    api.get<TipoActividad[]>("/catalogos/tipos-actividad").then((res) => setTipos(res.data));
     if (verEquipo) api.get<UsuarioOpcion[]>("/usuarios").then((res) => setUsuarios(res.data));
   }, [verEquipo]);
 

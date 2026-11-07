@@ -4,6 +4,8 @@ import { Modal } from "../components/Modal";
 import { Badge } from "../components/Badge";
 import { Avatar } from "../components/Avatar";
 import { ResponsableSelect } from "../components/ResponsableSelect";
+import { CatalogoSelect } from "../components/CatalogoSelect";
+import type { RefCatalogo } from "../types/configuracion";
 import { useAuth } from "../context/AuthContext";
 import { veTodo } from "../constants/roles";
 import { BajaModal } from "../components/BajaModal";
@@ -21,7 +23,8 @@ interface Empresa {
   sitioWeb?: string | null;
   estado: string;
   oportunidadAbiertaId?: number | null;
-  origen?: string | null;
+  origenId?: number | null;
+  origen?: RefCatalogo | null;
   observaciones?: string | null;
   responsableId?: number | null;
   responsable?: { id: number; nombre: string; apellido: string } | null;
@@ -43,7 +46,7 @@ const formVacio = {
   direccion: "",
   sitioWeb: "",
   estado: "POTENCIAL",
-  origen: "",
+  origenId: "",
   observaciones: "",
   responsableId: "",
 };
@@ -90,7 +93,7 @@ export function EmpresasPage() {
       direccion: empresa.direccion ?? "",
       sitioWeb: empresa.sitioWeb ?? "",
       estado: empresa.estado,
-      origen: empresa.origen ?? "",
+      origenId: empresa.origenId ? String(empresa.origenId) : "",
       observaciones: empresa.observaciones ?? "",
       responsableId: empresa.responsableId ? String(empresa.responsableId) : "",
     });
@@ -133,7 +136,11 @@ export function EmpresasPage() {
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
-    const payload = { ...form, responsableId: form.responsableId ? Number(form.responsableId) : null };
+    const payload = {
+      ...form,
+      responsableId: form.responsableId ? Number(form.responsableId) : null,
+      origenId: form.origenId ? Number(form.origenId) : null,
+    };
     try {
       if (editando) {
         await api.put(`/empresas/${editando.id}`, payload);
@@ -283,10 +290,18 @@ export function EmpresasPage() {
                 <input value={form.sitioWeb} onChange={(e) => setForm({ ...form, sitioWeb: e.target.value })} />
               </label>
               <ResponsableSelect
-                className="span-2"
                 value={form.responsableId}
                 onChange={(responsableId) => setForm((f) => ({ ...f, responsableId }))}
               />
+              <label>
+                Origen
+                <CatalogoSelect
+                  catalogo="origenes"
+                  value={form.origenId}
+                  actual={editando?.origen}
+                  onChange={(origenId) => setForm((f) => ({ ...f, origenId }))}
+                />
+              </label>
               <label className="span-2">
                 Observaciones
                 <textarea value={form.observaciones} onChange={(e) => setForm({ ...form, observaciones: e.target.value })} />
@@ -345,6 +360,10 @@ export function EmpresasPage() {
             <div className="detail-item">
               <dt>Dirección</dt>
               <dd>{detalle.direccion || "—"}</dd>
+            </div>
+            <div className="detail-item">
+              <dt>Origen</dt>
+              <dd>{detalle.origen?.nombre ?? "—"}</dd>
             </div>
           </dl>
           {detalle.observaciones && (

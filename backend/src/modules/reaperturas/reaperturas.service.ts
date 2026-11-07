@@ -34,6 +34,7 @@ async function validarReapertura(oportunidad: Oportunidad, etapaDestinoId: numbe
   const etapa = await reaperturasRepo.findEtapa(etapaDestinoId);
   if (!etapa) throw ApiError.notFound("Etapa no encontrada");
   if (etapa.tipo !== "ABIERTA") throw ApiError.badRequest("La oportunidad tiene que volver a una etapa abierta");
+  if (!etapa.activo) throw ApiError.badRequest(`La etapa «${etapa.nombre}» está desactivada`);
   if (etapa.esClasePrueba && (oportunidad.contacto?.bajaDefinitiva || oportunidad.empresa?.bajaDefinitiva)) {
     throw ApiError.badRequest(
       "Tuvo una inscripción cancelada anteriormente y no puede volver a una etapa de clase de prueba"

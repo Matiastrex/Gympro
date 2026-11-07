@@ -1,7 +1,7 @@
 import { NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { Rol } from "../constants/roles";
-import { FunnelIcon, DealIcon, PersonIcon, BuildingIcon, UsersIcon, LogoutIcon, ActividadIcon, DashboardIcon } from "./icons";
+import { FunnelIcon, DealIcon, PersonIcon, BuildingIcon, UsersIcon, LogoutIcon, ActividadIcon, DashboardIcon, EngranajeIcon } from "./icons";
 
 interface SidebarLink {
   to: string;
@@ -20,6 +20,7 @@ const links: SidebarLink[] = [
   { to: "/empresas", label: "Empresas", icon: BuildingIcon, end: false },
   { to: "/actividades", label: "Actividades", icon: ActividadIcon, end: false },
   { to: "/usuarios", label: "Usuarios", icon: UsersIcon, end: false, roles: ["ADMINISTRADOR"] },
+  { to: "/configuracion", label: "Configuración", icon: EngranajeIcon, end: false, roles: ["ADMINISTRADOR"] },
 ];
 
 export function Sidebar() {

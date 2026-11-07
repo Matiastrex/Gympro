@@ -7,6 +7,8 @@ import { PencilIcon, SearchIcon } from "../components/icons";
 import { HistorialComercial } from "../components/HistorialComercial";
 import { Reapertura, ReaperturaPendiente } from "../components/Reapertura";
 import { ResponsableSelect } from "../components/ResponsableSelect";
+import { CatalogoSelect } from "../components/CatalogoSelect";
+import type { RefCatalogo } from "../types/configuracion";
 
 interface Opcion {
   id: number;
@@ -31,8 +33,11 @@ interface Oportunidad {
   responsable?: { nombre: string; apellido: string } | null;
   productoId?: number | null;
   producto?: { nombre: string } | null;
-  origen?: string | null;
-  motivoPerdida?: string | null;
+  origenId?: number | null;
+  origen?: RefCatalogo | null;
+  motivoPerdidaId?: number | null;
+  motivoPerdida?: RefCatalogo | null;
+  motivoPerdidaDetalle?: string | null;
   observaciones?: string | null;
 }
 
@@ -56,7 +61,9 @@ const formVacio = {
   responsableId: "",
   etapaId: "",
   valorEstimado: "",
-  motivoPerdida: "",
+  origenId: "",
+  motivoPerdidaId: "",
+  motivoPerdidaDetalle: "",
   observaciones: "",
 };
 
@@ -115,7 +122,9 @@ export function OportunidadesPage() {
       responsableId: o.responsableId ? String(o.responsableId) : "",
       etapaId: String(o.etapaId),
       valorEstimado: o.valorEstimado != null ? String(o.valorEstimado) : "",
-      motivoPerdida: o.motivoPerdida ?? "",
+      origenId: o.origenId ? String(o.origenId) : "",
+      motivoPerdidaId: o.motivoPerdidaId ? String(o.motivoPerdidaId) : "",
+      motivoPerdidaDetalle: o.motivoPerdidaDetalle ?? "",
       observaciones: o.observaciones ?? "",
     });
     setError(null);
@@ -146,7 +155,10 @@ export function OportunidadesPage() {
       responsableId: form.responsableId ? Number(form.responsableId) : null,
       etapaId: Number(form.etapaId),
       valorEstimado: form.valorEstimado ? Number(form.valorEstimado) : null,
-      motivoPerdida: editando && etapas.find((et) => et.id === Number(form.etapaId))?.tipo == "PERDIDA" ? form.motivoPerdida || null : null,
+      origenId: form.origenId ? Number(form.origenId) : null,
+      ...(mostrarMotivoPerdida
+        ? { motivoPerdidaId: Number(form.motivoPerdidaId), motivoPerdidaDetalle: form.motivoPerdidaDetalle || null }
+        : { motivoPerdidaId: null, motivoPerdidaDetalle: null }),
       observaciones: form.observaciones || null,
     };
     try {
@@ -264,7 +276,11 @@ export function OportunidadesPage() {
                   onChange={(e) => {
                     const etapaId = e.target.value;
                     const etapa = etapas.find((et) => et.id === Number(etapaId));
-                    setForm({ ...form, etapaId, motivoPerdida: etapa?.tipo === "ABIERTA" ? "" : form.motivoPerdida });
+                    setForm({
+                      ...form,
+                      etapaId,
+                      ...(etapa?.tipo === "PERDIDA" ? {} : { motivoPerdidaId: "", motivoPerdidaDetalle: "" }),
+                    });
                   }}
                 >
                   <option value="">Elegir...</option>
@@ -280,10 +296,26 @@ export function OportunidadesPage() {
                 onChange={(responsableId) => setForm((f) => ({ ...f, responsableId }))}
               />
               {mostrarMotivoPerdida && (
-                <label className="span-2">
-                  Motivo de pérdida *
-                  <textarea required value={form.motivoPerdida} onChange={(e) => setForm({ ...form, motivoPerdida: e.target.value })} />
-                </label>
+                <>
+                  <label>
+                    Motivo de pérdida *
+                    <CatalogoSelect
+                      catalogo="motivos-perdida"
+                      required
+                      value={form.motivoPerdidaId}
+                      actual={editando?.motivoPerdida}
+                      onChange={(motivoPerdidaId) => setForm((f) => ({ ...f, motivoPerdidaId }))}
+                    />
+                  </label>
+                  <label>
+                    Detalle
+                    <input
+                      placeholder="Opcional"
+                      value={form.motivoPerdidaDetalle}
+                      onChange={(e) => setForm({ ...form, motivoPerdidaDetalle: e.target.value })}
+                    />
+                  </label>
+                </>
               )}
               <label>
                 Contacto
@@ -329,6 +361,15 @@ export function OportunidadesPage() {
               <label>
                 Valor estimado
                 <input type="number" value={form.valorEstimado} onChange={(e) => setForm({ ...form, valorEstimado: e.target.value })} />
+              </label>
+              <label>
+                Origen
+                <CatalogoSelect
+                  catalogo="origenes"
+                  value={form.origenId}
+                  actual={editando?.origen}
+                  onChange={(origenId) => setForm((f) => ({ ...f, origenId }))}
+                />
               </label>
               <label className="span-2">
                 Observaciones
@@ -376,6 +417,19 @@ export function OportunidadesPage() {
               <dt>Valor estimado</dt>
               <dd>{detalle.valorEstimado ? `$${detalle.valorEstimado}` : "—"}</dd>
             </div>
+            <div className="detail-item">
+              <dt>Origen</dt>
+              <dd>{detalle.origen?.nombre ?? "—"}</dd>
+            </div>
+            {detalle.motivoPerdida && (
+              <div className="detail-item">
+                <dt>Motivo de pérdida</dt>
+                <dd>
+                  {detalle.motivoPerdida.nombre}
+                  {detalle.motivoPerdidaDetalle && <span className="cell-muted"> — {detalle.motivoPerdidaDetalle}</span>}
+                </dd>
+              </div>
+            )}
           </dl>
           {detalle.observaciones && (
             <div className="detail-section">

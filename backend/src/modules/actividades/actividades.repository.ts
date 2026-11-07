@@ -50,10 +50,6 @@ export function findTipo(id: number) {
   return prisma.tipoActividad.findUnique({ where: { id } });
 }
 
-export function findTiposActivos() {
-  return prisma.tipoActividad.findMany({ where: { activo: true }, orderBy: [{ orden: "asc" }, { nombre: "asc" }] });
-}
-
 export function findContactoEmpresa(contactoId: number) {
   return prisma.contacto.findUnique({ where: { id: contactoId }, select: { empresaId: true } });
 }

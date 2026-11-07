@@ -6,6 +6,7 @@ import { Badge } from "../components/Badge";
 import { HistorialComercial } from "../components/HistorialComercial";
 import { Reapertura, ReaperturaModal, ReaperturaPendiente } from "../components/Reapertura";
 import { useAuth } from "../context/AuthContext";
+import { CatalogoSelect } from "../components/CatalogoSelect";
 
 interface Etapa {
   id: number;
@@ -49,7 +50,7 @@ export function EmbudoPage() {
   const [reabriendo, setReabriendo] = useState<{ oportunidad: Oportunidad; etapaId: number } | null>(null);
   const [detalle, setDetalle] = useState<OportunidadDetalle | null>(null);
   const [perdida, setPerdida] = useState<{ oportunidadId: number; etapaNuevaId: number } | null>(null);
-  const [motivo, setMotivo] = useState("");
+  const [motivo, setMotivo] = useState({ id: "", detalle: "" });
   const [baja, setBaja] = useState<{ oportunidadId: number; etapaNuevaId: number } | null>(null);
   const [motivoBaja, setMotivoBaja] = useState("");
   const [draggedOportunidadId, setDraggedOportunidadId] = useState<number | null>(null);
@@ -66,12 +67,18 @@ export function EmbudoPage() {
 
   const totalEtapas = columnas.length || 1;
 
-  async function moverEtapa(oportunidadId: number, etapaNuevaId: number, motivoPerdida?: string, motivoBajaParam?: string) {
+  async function moverEtapa(
+    oportunidadId: number,
+    etapaNuevaId: number,
+    motivoPerdida?: { id: number; detalle?: string },
+    motivoBajaParam?: string
+  ) {
     setError(null);
     try {
       await api.post(`/oportunidades/${oportunidadId}/cambiar-etapa`, {
         etapaNuevaId,
-        motivoPerdida,
+        motivoPerdidaId: motivoPerdida?.id,
+        motivoPerdidaDetalle: motivoPerdida?.detalle || undefined,
         motivoBaja: motivoBajaParam,
       });
       await cargar();
@@ -102,7 +109,7 @@ export function EmbudoPage() {
       return;
     }
     if (etapaTipo === "PERDIDA") {
-      setMotivo("");
+      setMotivo({ id: "", detalle: "" });
       setPerdida({ oportunidadId, etapaNuevaId });
       return;
     }
@@ -117,7 +124,7 @@ export function EmbudoPage() {
   async function confirmarPerdida(e: FormEvent) {
     e.preventDefault();
     if (!perdida) return;
-    await moverEtapa(perdida.oportunidadId, perdida.etapaNuevaId, motivo);
+    await moverEtapa(perdida.oportunidadId, perdida.etapaNuevaId, { id: Number(motivo.id), detalle: motivo.detalle });
     setPerdida(null);
   }
 
@@ -334,7 +341,20 @@ export function EmbudoPage() {
             <div className="form-grid">
               <label className="span-2">
                 ¿Por qué se pierde esta oportunidad? *
-                <textarea required value={motivo} onChange={(e) => setMotivo(e.target.value)} autoFocus />
+                <CatalogoSelect
+                  catalogo="motivos-perdida"
+                  required
+                  value={motivo.id}
+                  onChange={(id) => setMotivo((m) => ({ ...m, id }))}
+                />
+              </label>
+              <label className="span-2">
+                Detalle
+                <textarea
+                  placeholder="Opcional: lo que conviene recordar si vuelve a consultar"
+                  value={motivo.detalle}
+                  onChange={(e) => setMotivo((m) => ({ ...m, detalle: e.target.value }))}
+                />
               </label>
             </div>
             <div className="modal-actions">

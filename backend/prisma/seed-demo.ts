@@ -21,6 +21,19 @@ async function main() {
     return encontrado;
   };
 
+  const origenes = await prisma.origen.findMany();
+  const motivos = await prisma.motivoPerdida.findMany();
+  const origen = (nombre: string) => {
+    const encontrado = origenes.find((item) => item.nombre === nombre);
+    if (!encontrado) throw new Error(`Falta el origen ${nombre}. Ejecutá primero npm run prisma:seed.`);
+    return encontrado.id;
+  };
+  const motivo = (nombre: string) => {
+    const encontrado = motivos.find((item) => item.nombre === nombre);
+    if (!encontrado) throw new Error(`Falta el motivo de pérdida ${nombre}. Ejecutá primero npm run prisma:seed.`);
+    return encontrado.id;
+  };
+
   await prisma.$transaction(async (tx) => {
     await tx.notificacion.deleteMany();
     await tx.solicitudReapertura.deleteMany();
@@ -38,7 +51,7 @@ async function main() {
         email: "rrhh@textildeloeste.test",
         telefono: "011-4567-8901",
         estado: "POTENCIAL",
-        origen: "Recomendación",
+        origenId: origen("Recomendación"),
         observaciones: "Interesada en convenio corporativo para empleados.",
         responsableId: admin.id,
       },
@@ -53,7 +66,7 @@ async function main() {
         telefono: "011-4567-8902",
         empresaId: empresa.id,
         responsableId: admin.id,
-        origen: "Recomendación",
+        origenId: origen("Recomendación"),
       },
     });
 
@@ -64,7 +77,7 @@ async function main() {
         email: "juan.perez@test.local",
         telefono: "11-5555-0101",
         responsableId: admin.id,
-        origen: "Instagram",
+        origenId: origen("Instagram"),
         observaciones: "Consulta por musculación y horarios de la mañana.",
       },
     });
@@ -76,7 +89,7 @@ async function main() {
         email: "sofia.gomez@test.local",
         telefono: "11-5555-0102",
         responsableId: admin.id,
-        origen: "Sitio web",
+        origenId: origen("Sitio web"),
       },
     });
 
@@ -89,7 +102,8 @@ async function main() {
       estado: "ABIERTA" | "GANADA" | "PERDIDA";
       valorEstimado: number;
       probabilidadCierre: number;
-      motivoPerdida?: string;
+      motivoPerdidaId?: number;
+      motivoPerdidaDetalle?: string;
       observaciones?: string;
       recorrido: { etapaId: number; observacion: string }[];
     }) => {
@@ -106,7 +120,8 @@ async function main() {
           probabilidadCierre: data.probabilidadCierre,
           fechaEstimadaCierre: data.estado === "ABIERTA" ? new Date("2026-10-15") : null,
           fechaRealCierre: data.estado === "ABIERTA" ? null : new Date("2026-09-20"),
-          motivoPerdida: data.motivoPerdida,
+          motivoPerdidaId: data.motivoPerdidaId,
+          motivoPerdidaDetalle: data.motivoPerdidaDetalle,
           observaciones: data.observaciones,
         },
       });
@@ -179,7 +194,8 @@ async function main() {
       estado: "PERDIDA",
       valorEstimado: 17000,
       probabilidadCierre: 0,
-      motivoPerdida: "Eligió una alternativa más económica.",
+      motivoPerdidaId: motivo("Precio"),
+      motivoPerdidaDetalle: "Eligió una alternativa más económica.",
       recorrido: [
         { etapaId: etapa("Consulta recibida").id, observacion: "Consulta inicial." },
         { etapaId: etapa("Perdida").id, observacion: "Informó que eligió otra opción." },

@@ -7,6 +7,8 @@ const includeCompleto = {
   responsable: { select: { id: true, nombre: true, apellido: true } },
   producto: { select: { id: true, nombre: true } },
   etapa: true,
+  origen: { select: { id: true, nombre: true } },
+  motivoPerdida: { select: { id: true, nombre: true } },
 } satisfies Prisma.OportunidadInclude;
 
 export function findAll(filtros: { etapaId?: number; responsableId?: number }) {
@@ -99,11 +101,11 @@ export function findHistorial(oportunidadId: number) {
 }
 
 export function findEtapaPorTipo(tipo: "BAJA") {
-  return prisma.etapa.findFirst({ where: { tipo }, orderBy: { orden: "asc" } });
+  return prisma.etapa.findFirst({ where: { tipo, activo: true }, orderBy: { orden: "asc" } });
 }
 
 export function findEtapaTipo(id: number) {
-  return prisma.etapa.findUnique({ where: { id }, select: { tipo: true, esClasePrueba: true } });
+  return prisma.etapa.findUnique({ where: { id }, select: { nombre: true, tipo: true, esClasePrueba: true, activo: true } });
 }
 
 export function findContactoParaCrear(id: number) {
@@ -146,7 +148,8 @@ export function update(id: number, data: Prisma.OportunidadUpdateInput, reasigna
 // ABIERTA, las oportunidades recién cerradas (Inscripto/Perdida) desaparecerían
 // del tablero entero en vez de mostrarse en su columna de cierre.
 export async function findAgrupadasPorEtapa(filtros: { responsableId?: number }) {
-  const etapas = await prisma.etapa.findMany({ orderBy: { orden: "asc" } });
+  // Solo las activas: una etapa con oportunidades no se puede desactivar, así que no se pierde ninguna tarjeta.
+  const etapas = await prisma.etapa.findMany({ where: { activo: true }, orderBy: { orden: "asc" } });
   const oportunidades = await prisma.oportunidad.findMany({
     where: { responsableId: filtros.responsableId },
     include: includeCompleto,

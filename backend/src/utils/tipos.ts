@@ -9,3 +9,7 @@ export type ExactlyOne<T> = {
 }[keyof T];
 
 
+// Cierra un `switch` sobre una unión: si falta un caso, no compila.
+export function assertNever(valor: never): never {
+  throw new Error(`Caso no contemplado: ${JSON.stringify(valor)}`);
+}

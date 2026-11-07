@@ -2,6 +2,7 @@ import { z } from "zod";
 import { ApiError } from "../../utils/apiError";
 import * as contactosRepo from "./contactos.repository";
 import * as oportunidadesService from "../oportunidades/oportunidades.service";
+import * as catalogosService from "../catalogos/catalogos.service";
 import { Actor, Modo, alcanceConCreador, resolverResponsable, verificarAcceso, verificarAccesoRelacion } from "../../utils/permisos";
 
 export const contactoSchema = z.object({
@@ -14,7 +15,7 @@ export const contactoSchema = z.object({
   empresaId: z.number().int().optional().nullable(),
   responsableId: z.number().int().optional().nullable(),
   estado: z.enum(["POTENCIAL", "CLIENTE", "INACTIVO", "NO_CONTACTAR"]).optional(),
-  origen: z.string().optional().nullable(),
+  origenId: z.number().int().positive().optional().nullable(),
   observaciones: z.string().optional().nullable(),
 });
 
@@ -38,12 +39,14 @@ export async function obtener(id: number, actor: Actor, modo: Modo = "editar") {
 
 export async function crear(data: ContactoInput, actor: Actor) {
   await verificarAccesoRelacion(actor, "empresa", data.empresaId);
+  await catalogosService.validarSeleccion("origenes", data.origenId);
   const responsableId = await resolverResponsable(actor, data.responsableId);
   return contactosRepo.create({ ...data, responsableId, creadoPorId: actor.userId } as any);
 }
 
 export async function actualizar(id: number, data: ContactoInput, actor: Actor) {
   const contacto = await obtener(id, actor);
+  await catalogosService.validarSeleccion("origenes", data.origenId, contacto.origenId);
   if (data.empresaId !== contacto.empresaId) {
     await verificarAccesoRelacion(actor, "empresa", data.empresaId);
   }

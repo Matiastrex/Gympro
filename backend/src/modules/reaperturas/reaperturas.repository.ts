@@ -94,7 +94,7 @@ export function reabrir(r: Reapertura) {
 
     const oportunidad = await tx.oportunidad.update({
       where: { id: r.oportunidadId },
-      data: { etapaId: r.etapaDestinoId, estado: "ABIERTA", fechaRealCierre: null, motivoPerdida: null },
+      data: { etapaId: r.etapaDestinoId, estado: "ABIERTA", fechaRealCierre: null, motivoPerdidaId: null, motivoPerdidaDetalle: null },
     });
 
     if (r.empresaId != null) {

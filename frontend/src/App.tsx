@@ -1,5 +1,5 @@
 import { lazy, Suspense } from "react";
-import { Routes, Route } from "react-router-dom";
+import { Routes, Route, Navigate } from "react-router-dom";
 import { ProtectedRoute } from "./routes/ProtectedRoute";
 import { Sidebar } from "./components/Sidebar";
 import { Topbar } from "./components/Topbar";
@@ -11,6 +11,7 @@ import { EmpresasPage } from "./pages/EmpresasPage";
 import { UsuariosPage } from "./pages/UsuariosPage";
 import { ActividadesPage } from "./pages/ActividadesPage";
 import { NotificacionesPage } from "./pages/NotificacionesPage";
+import { ConfiguracionPage } from "./pages/ConfiguracionPage";
 
 // recharts pesa: el dashboard se baja aparte para no agrandar el bundle del resto de la app.
 const DashboardPage = lazy(() => import("./pages/DashboardPage").then((m) => ({ default: m.DashboardPage })));
@@ -92,6 +93,15 @@ export default function App() {
           }
         />
         <Route element={<ProtectedRoute roles={["ADMINISTRADOR"]} />}>
+          <Route path="/configuracion" element={<Navigate to="/configuracion/etapas" replace />} />
+          <Route
+            path="/configuracion/:seccion"
+            element={
+              <AppLayout>
+                <ConfiguracionPage />
+              </AppLayout>
+            }
+          />
           <Route
             path="/usuarios"
             element={

@@ -5,6 +5,8 @@ import { Badge } from "../components/Badge";
 import { Avatar } from "../components/Avatar";
 import { BajaModal } from "../components/BajaModal";
 import { ResponsableSelect } from "../components/ResponsableSelect";
+import { CatalogoSelect } from "../components/CatalogoSelect";
+import type { RefCatalogo } from "../types/configuracion";
 import { HistorialComercial } from "../components/HistorialComercial";
 import { useAuth } from "../context/AuthContext";
 import { veTodo } from "../constants/roles";
@@ -25,7 +27,8 @@ interface Contacto {
   email?: string | null;
   telefono?: string | null;
   estado: string;
-  origen?: string | null;
+  origenId?: number | null;
+  origen?: RefCatalogo | null;
   observaciones?: string | null;
   oportunidadAbiertaId?: number | null;
   empresaId?: number | null;
@@ -51,6 +54,7 @@ const formVacio = {
   estado: "POTENCIAL",
   observaciones: "",
   responsableId: "",
+  origenId: "",
 };
 
 export function ContactosPage() {
@@ -102,6 +106,7 @@ export function ContactosPage() {
       estado: contacto.estado,
       observaciones: contacto.observaciones ?? "",
       responsableId: contacto.responsableId ? String(contacto.responsableId) : "",
+      origenId: contacto.origenId ? String(contacto.origenId) : "",
     });
     setError(null);
     setEditando(contacto);
@@ -147,6 +152,7 @@ export function ContactosPage() {
       ...form,
       empresaId: form.empresaId ? Number(form.empresaId) : null,
       responsableId: form.responsableId ? Number(form.responsableId) : null,
+      origenId: form.origenId ? Number(form.origenId) : null,
       estado: estadoPorEmpresa ?? form.estado,
     };
     try {
@@ -326,10 +332,18 @@ export function ContactosPage() {
                 </select>
               </label>
               <ResponsableSelect
-                className="span-2"
                 value={form.responsableId}
                 onChange={(responsableId) => setForm((f) => ({ ...f, responsableId }))}
               />
+              <label>
+                Origen
+                <CatalogoSelect
+                  catalogo="origenes"
+                  value={form.origenId}
+                  actual={editando?.origen}
+                  onChange={(origenId) => setForm((f) => ({ ...f, origenId }))}
+                />
+              </label>
               <label className="span-2">
                 Observaciones
                 <textarea value={form.observaciones} onChange={(e) => setForm({ ...form, observaciones: e.target.value })} />
@@ -388,6 +402,10 @@ export function ContactosPage() {
             <div className="detail-item">
               <dt>Documento</dt>
               <dd>{detalle.documento || "—"}</dd>
+            </div>
+            <div className="detail-item">
+              <dt>Origen</dt>
+              <dd>{detalle.origen?.nombre ?? "—"}</dd>
             </div>
           </dl>
           {detalle.observaciones && (

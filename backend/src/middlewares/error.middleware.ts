@@ -1,5 +1,6 @@
 import { NextFunction, Request, Response } from "express";
 import { ZodError } from "zod";
+import { Prisma } from "@prisma/client";
 import { ApiError } from "../utils/apiError";
 
 export function errorMiddleware(
@@ -14,6 +15,11 @@ export function errorMiddleware(
       error: "Datos inválidos",
       detalles: err.flatten().fieldErrors,
     });
+  }
+
+  // Valor repetido en una columna única (p. ej. dos orígenes con el mismo nombre).
+  if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
+    return res.status(409).json({ error: "Ya existe uno con ese nombre" });
   }
 
   if (err instanceof ApiError) {

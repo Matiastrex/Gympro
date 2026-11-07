@@ -51,7 +51,7 @@ function useNoLeidas() {
 export function Topbar() {
   const { pathname } = useLocation();
   const { usuario } = useAuth();
-  const title = TITLES[pathname] ?? "GymPro CRM";
+  const title = TITLES[pathname] ?? (pathname.startsWith("/configuracion") ? "Configuración" : "GymPro CRM");
   const noLeidas = useNoLeidas();
 
   return (

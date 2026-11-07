@@ -16,6 +16,7 @@ export function findAll({ filtro, visibilidad }: { filtro?: string; visibilidad:
     include: {
       empresa: { select: { id: true, razonSocial: true } },
       responsable: { select: { id: true, nombre: true, apellido: true } },
+      origen: { select: { id: true, nombre: true } },
     },
     orderBy: { apellido: "asc" },
   });
@@ -27,6 +28,7 @@ export function findById(id: number) {
     include: {
       empresa: true,
       responsable: { select: { id: true, nombre: true, apellido: true } },
+      origen: { select: { id: true, nombre: true } },
       oportunidades: { include: { etapa: true } },
     },
   });

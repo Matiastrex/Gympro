@@ -2,6 +2,7 @@ import { z } from "zod";
 import { ApiError } from "../../utils/apiError";
 import * as empresasRepo from "./empresas.repository";
 import * as oportunidadesService from "../oportunidades/oportunidades.service";
+import * as catalogosService from "../catalogos/catalogos.service";
 import { Actor, Modo, alcanceConCreador, resolverResponsable, verificarAcceso } from "../../utils/permisos";
 
 export const empresaSchema = z.object({
@@ -13,7 +14,7 @@ export const empresaSchema = z.object({
   direccion: z.string().optional().nullable(),
   sitioWeb: z.string().optional().nullable(),
   estado: z.enum(["POTENCIAL", "CLIENTE", "INACTIVO", "NO_CONTACTAR"]).optional(),
-  origen: z.string().optional().nullable(),
+  origenId: z.number().int().positive().optional().nullable(),
   observaciones: z.string().optional().nullable(),
   responsableId: z.number().int().optional().nullable(),
 });
@@ -37,12 +38,14 @@ export async function obtener(id: number, actor: Actor, modo: Modo = "editar") {
 }
 
 export async function crear(data: EmpresaInput, actor: Actor) {
+  await catalogosService.validarSeleccion("origenes", data.origenId);
   const responsableId = await resolverResponsable(actor, data.responsableId);
   return empresasRepo.create({ ...data, responsableId, creadoPorId: actor.userId } as any);
 }
 
 export async function actualizar(id: number, data: EmpresaInput, actor: Actor) {
   const empresa = await obtener(id, actor);
+  await catalogosService.validarSeleccion("origenes", data.origenId, empresa.origenId);
   const responsableId = await resolverResponsable(actor, data.responsableId, empresa.responsableId);
   return empresasRepo.update(id, { ...data, responsableId } as any);
 }

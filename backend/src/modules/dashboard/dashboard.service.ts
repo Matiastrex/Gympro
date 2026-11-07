@@ -87,7 +87,7 @@ export async function obtener(filtros: FiltrosDashboard, actor: Actor): Promise<
   const defecto = rangoPorDefecto();
   const rango = { desde: filtros.desde ?? defecto.desde, hasta: filtros.hasta ?? defecto.hasta };
 
-  const [abiertas, cerradas, porEtapa, etapas, motivos, porTipo, tipos, pendientes] = await Promise.all([
+  const [abiertas, cerradas, porEtapa, etapas, motivos, porTipo, tipos, pendientes, catalogoMotivos] = await Promise.all([
     dashboardRepo.contarAbiertas(where.oportunidad),
     dashboardRepo.cerradasEnRango(where.oportunidad, rango),
     dashboardRepo.abiertasPorEtapa(where.oportunidad),
@@ -96,6 +96,7 @@ export async function obtener(filtros: FiltrosDashboard, actor: Actor): Promise<
     dashboardRepo.actividadesPorTipo(where.actividad, rango),
     dashboardRepo.tiposActividad(),
     actor.rol === "ADMINISTRADOR" ? dashboardRepo.reaperturasPendientes() : Promise.resolve(null),
+    dashboardRepo.motivosPerdidaCatalogo(),
   ]);
 
   const esInscripto = (estado: string) => estado === "GANADA" || estado === "BAJA";
@@ -111,8 +112,12 @@ export async function obtener(filtros: FiltrosDashboard, actor: Actor): Promise<
     else fila.perdidas++;
   }
 
+  const nombreMotivo = new Map(catalogoMotivos.map((m) => [m.id, m.nombre]));
   const motivosOrdenados = motivos
-    .map((m) => ({ motivo: m.motivoPerdida?.trim() || "Sin motivo", cantidad: m._count._all }))
+    .map((m) => ({
+      motivo: (m.motivoPerdidaId != null && nombreMotivo.get(m.motivoPerdidaId)) || "Sin motivo",
+      cantidad: m._count._all,
+    }))
     .sort((a, b) => b.cantidad - a.cantidad);
   const otros = motivosOrdenados.slice(MAX_MOTIVOS).reduce((total, m) => total + m.cantidad, 0);
 

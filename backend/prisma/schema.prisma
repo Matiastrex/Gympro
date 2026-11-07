@@ -94,7 +94,8 @@ model Empresa {
   sitioWeb      String?
   estado        EstadoEntidad @default(POTENCIAL)
   bajaDefinitiva Boolean      @default(false)
-  origen        String?
+  origenId      Int?
+  origen        Origen?       @relation(fields: [origenId], references: [id])
   observaciones String?       @db.Text
 
   responsableId Int?
@@ -126,7 +127,8 @@ model Contacto {
   telefono      String?
   estado        EstadoEntidad @default(POTENCIAL)
   bajaDefinitiva Boolean      @default(false)
-  origen        String?
+  origenId      Int?
+  origen        Origen?       @relation(fields: [origenId], references: [id])
   observaciones String?       @db.Text
 
   empresaId Int?
@@ -174,6 +176,8 @@ model Etapa {
   orden         Int
   tipo          TipoEtapa @default(ABIERTA)
   esClasePrueba Boolean   @default(false)
+  // Se desactiva en vez de borrarse: el historial apunta a las etapas.
+  activo        Boolean   @default(true)
 
   oportunidades   Oportunidad[]
   historialComoAnterior HistorialEtapa[] @relation("EtapaAnterior")
@@ -209,9 +213,12 @@ model Oportunidad {
   fechaEstimadaCierre DateTime?
   fechaRealCierre     DateTime?
   fechaBaja           DateTime?
-  origen              String?
+  origenId            Int?
+  origen              Origen?            @relation(fields: [origenId], references: [id])
   estado              EstadoOportunidad  @default(ABIERTA)
-  motivoPerdida       String?
+  motivoPerdidaId      Int?
+  motivoPerdida        MotivoPerdida?    @relation(fields: [motivoPerdidaId], references: [id])
+  motivoPerdidaDetalle String?           @db.Text
   motivoBaja          String?
   observaciones       String?            @db.Text
 
@@ -224,6 +231,33 @@ model Oportunidad {
   updatedAt DateTime @updatedAt
 
   @@map("oportunidades")
+}
+
+// ---------- Catálogos configurables por el administrador ----------
+// Mismo formato que TipoActividad: se desactivan, nunca se borran.
+
+model Origen {
+  id     Int     @id @default(autoincrement())
+  nombre String  @unique
+  orden  Int     @default(0)
+  activo Boolean @default(true)
+
+  empresas      Empresa[]
+  contactos     Contacto[]
+  oportunidades Oportunidad[]
+
+  @@map("origenes")
+}
+
+model MotivoPerdida {
+  id     Int     @id @default(autoincrement())
+  nombre String  @unique
+  orden  Int     @default(0)
+  activo Boolean @default(true)
+
+  oportunidades Oportunidad[]
+
+  @@map("motivos_perdida")
 }
 
 // ---------- Módulo 3: actividades e historial comercial ----------

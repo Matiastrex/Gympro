@@ -1,18 +1,44 @@
 import { Router } from "express";
 import { asyncHandler } from "../../utils/asyncHandler";
 import { requireAuth } from "../../middlewares/auth.middleware";
-import { prisma } from "../../config/db";
+import { requireRole } from "../../middlewares/role.middleware";
+import * as etapasService from "./etapas.service";
 
-// Igual que productos: las etapas están precargadas por seed.ts. Su
-// configuración desde la UI (crear/editar/reordenar etapas) es requisito
-// de la Entrega Final, no del MVP.
+// Embudo configurable: todos leen las etapas activas; el admin las configura.
 export const etapasRouter = Router();
 etapasRouter.use(requireAuth);
 
+const soloAdmin = requireRole("ADMINISTRADOR");
+
 etapasRouter.get(
   "/",
-  asyncHandler(async (_req, res) => {
-    const etapas = await prisma.etapa.findMany({ orderBy: { orden: "asc" } });
-    res.json(etapas);
+  asyncHandler(async (req, res) => {
+    res.json(await etapasService.listar(req.query.incluirInactivas === "true", req.user!));
+  })
+);
+
+etapasRouter.post(
+  "/",
+  soloAdmin,
+  asyncHandler(async (req, res) => {
+    res.status(201).json(await etapasService.crear(etapasService.crearSchema.parse(req.body)));
+  })
+);
+
+etapasRouter.post(
+  "/reordenar",
+  soloAdmin,
+  asyncHandler(async (req, res) => {
+    const { ids } = etapasService.reordenarSchema.parse(req.body);
+    res.json(await etapasService.reordenar(ids));
+  })
+);
+
+etapasRouter.put(
+  "/:id",
+  soloAdmin,
+  asyncHandler(async (req, res) => {
+    const data = etapasService.actualizarSchema.parse(req.body);
+    res.json(await etapasService.actualizar(Number(req.params.id), data));
   })
 );

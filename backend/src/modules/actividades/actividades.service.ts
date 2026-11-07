@@ -115,10 +115,6 @@ export async function listar(filtros: FiltrosActividades, actor: Actor): Promise
   return paginado(items, total, { page, pageSize });
 }
 
-export function tiposActivos() {
-  return actividadesRepo.findTiposActivos();
-}
-
 // ---------- Alta ----------
 
 // Margen para diferencias de reloj entre el navegador y el servidor.

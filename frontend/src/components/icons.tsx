@@ -230,3 +230,12 @@ export function ReabrirIcon(props: IconProps) {
     </svg>
   );
 }
+
+export function EngranajeIcon(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <circle cx="12" cy="12" r="3" />
+      <path d="M12 3.5v2M12 18.5v2M3.5 12h2M18.5 12h2M6 6l1.4 1.4M16.6 16.6 18 18M6 18l1.4-1.4M16.6 7.4 18 6" />
+    </svg>
+  );
+}

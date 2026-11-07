@@ -73,7 +73,7 @@ export function ActividadForm({ entidad, nombreEntidad, onClose, onRegistrada }:
   const max = useMemo(ahoraLocal, []);
 
   useEffect(() => {
-    api.get<TipoActividad[]>("/tipos-actividad").then((res) => setTipos(res.data));
+    api.get<TipoActividad[]>("/catalogos/tipos-actividad").then((res) => setTipos(res.data));
   }, []);
 
   useEffect(() => {

@@ -23,7 +23,7 @@ npm start                # run compiled dist/server.js
 npm run setup            # prisma generate && prisma migrate dev && seed (first-time DB setup)
 npm run prisma:generate  # regenerate Prisma client after editing schema.prisma
 npm run prisma:migrate   # create/apply a migration (prompts for a name unless --name is passed)
-npm run prisma:seed      # re-run prisma/seed.ts (users, etapas, productos, tipos de actividad)
+npm run prisma:seed      # re-run prisma/seed.ts (users, etapas, productos and the catálogos)
 npm run seed:demo        # WIPES oportunidades/contactos/empresas/actividades and loads demo data
 ```
 
@@ -67,9 +67,8 @@ Each domain lives under `backend/src/modules/<name>/` with up to three files:
 - `*.repository.ts` — the only place that calls `prisma.*`. Encapsulates includes/selects/ordering
   so query shape isn't duplicated across services.
 
-Some modules are read-mostly and skip the service/repository split (`etapas`, `productos`) — routes
-call Prisma directly for those. When adding a real module, follow the three-file pattern used by
-`empresas`, `contactos`, and `oportunidades`.
+Every module follows the three-file pattern (`embudo` is just a route over `oportunidadesService`).
+Follow it when adding one.
 
 All module routers are wired in `backend/src/routes/index.ts` and mounted under `/api` in
 `backend/src/app.ts`. `errorMiddleware` (last middleware in `app.ts`) is the single place that turns
@@ -81,7 +80,8 @@ Auth is a JWT bearer token (`utils/jwt.ts`, `middlewares/auth.middleware.ts`) ch
 `router.use(requireAuth)`. `requireAuth` re-reads the usuario on every request, so `req.user`
 (`{ userId, rol }`) carries the **current** rol, and a usuario with `activo: false` gets a 401 even with
 a still-valid token. Gate whole routes with `requireRole(...roles)` (`middlewares/role.middleware.ts`)
-after `requireAuth`; the usuarios management routes and approving/rejecting reaperturas use it.
+after `requireAuth`. It's used by usuarios management, approving or rejecting reaperturas, and every
+write in configuración (catálogos, etapas, productos).
 
 Per-record permissions live in `utils/permisos.ts`, and services receive the `actor` (`req.user!`):
 - ADMINISTRADOR and RESPONSABLE_COMERCIAL (`veTodo`) see everything and can assign/reassign
@@ -114,8 +114,8 @@ honored for admins only. On the frontend, `constants/roles.ts` holds the `Rol` t
 
 Actividades (`modules/actividades`, page `ActividadesPage.tsx`) are past interactions — **immutable**:
 only `POST /api/actividades` and reads, no PUT/DELETE. Rules in `actividades.service.ts`:
-- `tipoActividadId` points to the configurable `TipoActividad` catalog (`GET /api/tipos-actividad`,
-  active ones only; deactivate with `activo: false`, never delete). `fecha` can't be in the future
+- `tipoActividadId` points to the configurable `TipoActividad` catalog (`GET
+  /api/catalogos/tipos-actividad`). `fecha` can't be in the future
   (agenda/tareas are out of scope) and `usuarioId` is always the actor.
 - Must link a contacto, empresa and/or oportunidad. From an oportunidad, its contacto/empresa are
   copied onto the actividad; a contacto with convenio adds its empresa. That's what makes it show up in
@@ -143,7 +143,7 @@ Reapertura of a lost oportunidad (`modules/reaperturas`) is the only way back fr
   or a second admin gets "ya fue resuelta" instead of reopening twice. `GET /api/reaperturas?estado=`:
   admins see all, others only their own.
 - `reaperturasRepo.reabrir` is one transaction: oportunidad → destino etapa, `estado: ABIERTA`,
-  `fechaRealCierre` and `motivoPerdida` → null; contacto/empresa → `POTENCIAL` with this oportunidad as
+  `fechaRealCierre`, `motivoPerdidaId` and `motivoPerdidaDetalle` → null; contacto/empresa → `POTENCIAL` with this oportunidad as
   `oportunidadAbiertaId` (an empresa's contactos follow it); a `HistorialEtapa` row authored by the admin
   ("Reabierta con autorización de X. Pedido por Y: motivo"); solicitud → `APROBADA`; notification to the
   requester. `cambiarEtapa`'s "ya está cerrada" guard is unchanged — don't add reopen logic there.
@@ -175,11 +175,38 @@ Dashboard (`modules/dashboard`, `GET /api/dashboard?desde=&hasta=&usuarioId=&rol
 - Metrics: open oportunidades and their `valorEstimado` (now, not by period); inscriptos = `estado
   GANADA | BAJA` (a cancelled inscription was still won) and perdidas, by `fechaRealCierre` in the period;
   conversion = inscriptos / (inscriptos + perdidas); open oportunidades per `ABIERTA` etapa; top 6
-  `motivoPerdida` + "Otros"; actividades per tipo; a monthly inscriptos vs. perdidas series; pending
+  `motivoPerdidaId` (by catálogo name) + "Otros"; actividades per tipo; a monthly inscriptos vs. perdidas series; pending
   reaperturas (admin only). The default period is the last 6 months.
 - Charts use `recharts`, lazy-loaded in `App.tsx` so the rest of the bundle stays small. Series colors are
   `--info` (inscriptos) and `--brand` (perdidas / single-series bars), a pair that passed the dataviz
   palette validator.
+
+Configuración (admin only; page `ConfiguracionPage.tsx` at `/configuracion/:seccion`, with tabs for
+etapas · productos · tipos-actividad · origenes · motivos-perdida). **Nothing configurable is ever
+deleted, only deactivated (`activo: false`)**, because old records keep pointing at it.
+- `modules/catalogos`: `origenes`, `motivos-perdida` and `tipos-actividad` share one module and one route,
+  `/api/catalogos/:catalogo`. `GET` returns active rows (every rol, it feeds the selects;
+  `?incluirInactivos=true` is admin only). Admin-only `POST`, `PUT /:id` (`nombre`, `activo`) and
+  `POST /:catalogo/reordenar` (`{ ids }`). An unknown catálogo → 404, and the last active row can't be
+  deactivated. The repository maps each name to its Prisma table with an exhaustive `switch`.
+- `catalogosService.validarSeleccion(catalogo, id, actual?)` is how forms accept a catálogo value. It must
+  exist and be active, unless it's unchanged from what the record already had. Empresa, contacto and
+  oportunidad use it for `origenId`, and loss uses it for `motivoPerdidaId`.
+- `modules/etapas`: `GET` returns active ones (`?incluirInactivas=true` for admin), plus `POST`,
+  `PUT /:id` and `POST /reordenar`. There must always be **at least one active etapa of each tipo**
+  (ABIERTA, GANADA, PERDIDA, BAJA). An etapa that currently holds oportunidades can't be deactivated
+  or change `tipo`. `esClasePrueba` only sticks on ABIERTA. The board and the dashboard show active
+  etapas only, which is safe because an inactive one can't hold oportunidades.
+- `modules/productos`: active ones on `GET` (`?incluirInactivos=true` for admin); admin `POST` and `PUT /:id`.
+- `errorMiddleware` maps Prisma `P2002` (unique violation) → 409 "Ya existe uno con ese nombre".
+- Frontend: `components/config/` holds `CatalogoEditor` (generic), `EtapasEditor` (with a live preview
+  of the embudo) and `ProductosEditor`; `comun.tsx` holds the shared row pieces. Forms pick catálogo
+  values with `components/CatalogoSelect.tsx`, which caches per catálogo; call
+  `invalidarCatalogo(catalogo)` after editing one. It keeps showing a deactivated current value as
+  "(inactivo)".
+- `origen` (empresa, contacto, oportunidad) and `motivoPerdida` used to be free text. The
+  `add_catalogos_configurables` migration moved existing origins into the catálogo and old loss texts
+  into "Otro", with the original text as `motivoPerdidaDetalle`.
 
 ### Data model is ahead of the current API/UI on purpose
 
@@ -194,7 +221,10 @@ Key domain rules enforced in the service layer (see `oportunidades.service.ts`):
 - Changing an oportunidad's `etapaId` (`cambiarEtapa`) always writes a `HistorialEtapa` row in the
   same Prisma transaction — stage changes and their audit trail must never be split.
 - Moving into an `Etapa` whose `tipo` is `GANADA`/`PERDIDA` auto-derives `estado` and
-  `fechaRealCierre` on the oportunidad; moving to `PERDIDA` additionally requires `motivoPerdida`.
+  `fechaRealCierre` on the oportunidad. Moving to `PERDIDA` also requires an active `motivoPerdidaId` (plus
+  an optional `motivoPerdidaDetalle`), and the historial gets "Motivo de pérdida: {nombre} — {detalle}".
+  Rules key off the etapa's `tipo`, never its name, so several GANADA or PERDIDA etapas work. Only
+  active etapas are valid destinations (`crear`, `cambiarEtapa`, reapertura).
 - Once an oportunidad's `estado` isn't `ABIERTA`, `cambiarEtapa` rejects further stage changes. A
   `PERDIDA` one can only come back through the authorized reapertura flow (see above). The one other
   exception is Inscripto (`GANADA`) → "Inscripción cancelada" (`tipo: BAJA`), which is only reachable
@@ -231,7 +261,7 @@ the shared `components/BajaModal.tsx`:
 - **Producto** = a gym membership plan (e.g. "Musculación mensual", "Personal training") — not the
   same concept as GymPro's own SaaS pricing tiers.
 - **Oportunidad** = an in-progress membership inquiry.
-- **Etapas** (seeded, ordered): Consulta recibida → Clase de prueba agendada → Clase de prueba
+- **Etapas** (seeded, configurable by the admin): Consulta recibida → Clase de prueba agendada → Clase de prueba
   realizada → Propuesta de membresía enviada → Negociación → Inscripto (Ganada) / Perdida, plus
   Inscripción cancelada (`tipo: BAJA`, only reachable from Inscripto).
 
@@ -245,7 +275,8 @@ via `localStorage`). `src/api/client.ts` is a single Axios instance: it attaches
 
 Routes: `/` is the Dashboard (landing page after login for every rol), `/embudo` is the board (it used to
 live at `/`), plus `/oportunidades`, `/contactos`, `/empresas`, `/actividades`, `/notificaciones`, and
-`/usuarios` (admin only). Add new routes to both `App.tsx` and the `TITLES` map in `Topbar.tsx`.
+`/usuarios` and `/configuracion/:seccion` (admin only). Add new routes to both `App.tsx` and the `TITLES`
+map in `Topbar.tsx`.
 
 ## Known bugs to fix
 

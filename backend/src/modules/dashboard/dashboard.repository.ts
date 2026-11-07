@@ -36,12 +36,12 @@ export function abiertasPorEtapa(scope: Prisma.OportunidadWhereInput) {
 }
 
 export function etapasAbiertas() {
-  return prisma.etapa.findMany({ where: { tipo: "ABIERTA" }, orderBy: { orden: "asc" }, select: { id: true, nombre: true } });
+  return prisma.etapa.findMany({ where: { tipo: "ABIERTA", activo: true }, orderBy: { orden: "asc" }, select: { id: true, nombre: true } });
 }
 
 export function motivosPerdida(scope: Prisma.OportunidadWhereInput, { desde, hasta }: Rango) {
   return prisma.oportunidad.groupBy({
-    by: ["motivoPerdida"],
+    by: ["motivoPerdidaId"],
     where: { ...scope, estado: "PERDIDA", fechaRealCierre: { gte: desde, lte: hasta } },
     _count: { _all: true },
   });
@@ -61,4 +61,8 @@ export function tiposActividad() {
 
 export function reaperturasPendientes() {
   return prisma.solicitudReapertura.count({ where: { estado: "PENDIENTE" } });
+}
+
+export function motivosPerdidaCatalogo() {
+  return prisma.motivoPerdida.findMany({ select: { id: true, nombre: true } });
 }

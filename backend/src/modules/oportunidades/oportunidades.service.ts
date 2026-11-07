@@ -3,6 +3,7 @@ import { Prisma } from "@prisma/client";
 import { ApiError } from "../../utils/apiError";
 import { prisma } from "../../config/db";
 import * as oportunidadesRepo from "./oportunidades.repository";
+import * as catalogosService from "../catalogos/catalogos.service";
 import { Actor, alcance, resolverResponsable, verificarAcceso, verificarAccesoRelacion } from "../../utils/permisos";
 
 export const oportunidadSchema = z.object({
@@ -15,12 +16,17 @@ export const oportunidadSchema = z.object({
   valorEstimado: z.number().optional().nullable(),
   probabilidadCierre: z.number().int().min(0).max(100).optional().nullable(),
   fechaEstimadaCierre: z.string().datetime().optional().nullable(),
-  origen: z.string().optional().nullable(),
-  motivoPerdida: z.string().optional().nullable(),
+  origenId: z.number().int().positive().optional().nullable(),
+  // Solo al estar en (o pasar a) una etapa de pérdida.
+  motivoPerdidaId: z.number().int().positive().optional().nullable(),
+  motivoPerdidaDetalle: z.string().trim().optional().nullable(),
   observaciones: z.string().optional().nullable(),
 });
 
 export type OportunidadInput = z.infer<typeof oportunidadSchema>;
+
+const MOTIVO_OBLIGATORIO = "Elegí el motivo por el que se perdió la oportunidad";
+const etapaDesactivada = (nombre: string) => ApiError.badRequest(`La etapa «${nombre}» está desactivada`);
 
 // Para un vendedor, alcance() pisa cualquier responsableId pedido: solo ve lo suyo.
 export function listar(filtros: { etapaId?: number; responsableId?: number }, actor: Actor) {
@@ -60,14 +66,17 @@ export async function crear(input: OportunidadInput, actor: Actor) {
 
   const etapa = await oportunidadesRepo.findEtapaTipo(data.etapaId);
   if (!etapa) throw ApiError.notFound("Etapa no encontrada");
+  if (!etapa.activo) throw etapaDesactivada(etapa.nombre);
+  await catalogosService.validarSeleccion("origenes", data.origenId);
   if (etapa.tipo === "BAJA") {
     // No existe una "etapa anterior" para una oportunidad recién creada, así
     // que Inscripción cancelada nunca es un destino válido en la creación: solo se llega ahí
     // moviendo una oportunidad que ya estaba en Inscripto (ver cambiarEtapa).
     throw ApiError.badRequest("No se puede crear una oportunidad directamente en la etapa Inscripción cancelada");
   }
-  if (etapa.tipo === "PERDIDA" && !data.motivoPerdida) {
-    throw ApiError.badRequest("Hay que indicar un motivo para cerrar la oportunidad");
+  if (etapa.tipo === "PERDIDA") {
+    if (!data.motivoPerdidaId) throw ApiError.badRequest(MOTIVO_OBLIGATORIO);
+    await catalogosService.validarSeleccion("motivos-perdida", data.motivoPerdidaId);
   }
 
   if (data.contactoId != null) {
@@ -114,7 +123,8 @@ export async function crear(input: OportunidadInput, actor: Actor) {
     ...data,
     estado,
     fechaRealCierre: etapa.tipo === "ABIERTA" ? null : new Date(),
-    motivoPerdida: etapa.tipo === "PERDIDA" ? data.motivoPerdida : null,
+    motivoPerdidaId: etapa.tipo === "PERDIDA" ? data.motivoPerdidaId : null,
+    motivoPerdidaDetalle: etapa.tipo === "PERDIDA" ? data.motivoPerdidaDetalle || null : null,
   };
 
   return oportunidadesRepo.create(dataConEstado as any, estadoEntidad, actor.userId);
@@ -138,12 +148,16 @@ export async function actualizar(id: number, input: OportunidadInput, actor: Act
 
   const etapa = await oportunidadesRepo.findEtapaTipo(data.etapaId);
   if (!etapa) throw ApiError.notFound("Etapa no encontrada");
-  if (etapa.tipo == "PERDIDA" && !data.motivoPerdida) {
-    throw ApiError.badRequest("Hay que indicar un motivo para cerrar la oportunidad");
+  await catalogosService.validarSeleccion("origenes", data.origenId, oportunidad.origenId);
+  if (etapa.tipo === "PERDIDA") {
+    if (!data.motivoPerdidaId) throw ApiError.badRequest(MOTIVO_OBLIGATORIO);
+    await catalogosService.validarSeleccion("motivos-perdida", data.motivoPerdidaId, oportunidad.motivoPerdidaId);
   }
 
-  const { etapaId, motivoPerdida, ...camposActualizacion } = data;
-  const motivo = etapa.tipo === "PERDIDA" ? motivoPerdida : null;
+  const { etapaId, motivoPerdidaId, motivoPerdidaDetalle, ...camposActualizacion } = data;
+  const motivo = etapa.tipo === "PERDIDA"
+    ? { motivoPerdidaId, motivoPerdidaDetalle: motivoPerdidaDetalle || null }
+    : { motivoPerdidaId: null, motivoPerdidaDetalle: null };
 
   if (etapaId !== oportunidad.etapaId) {
     return cambiarEtapa({
@@ -151,13 +165,14 @@ export async function actualizar(id: number, input: OportunidadInput, actor: Act
       etapaNuevaId: etapaId,
       usuarioId,
       observacion: data.observaciones ?? undefined,
-      motivoPerdida: motivo ?? undefined,
-      camposActualizacion: { ...camposActualizacion, motivoPerdida: motivo },
+      motivoPerdidaId: motivo.motivoPerdidaId ?? undefined,
+      motivoPerdidaDetalle: motivo.motivoPerdidaDetalle ?? undefined,
+      camposActualizacion: { ...camposActualizacion, ...motivo },
       reasignarEntidadesA,
     });
   }
 
-  return oportunidadesRepo.update(id, { ...camposActualizacion, motivoPerdida: motivo } as any, reasignarEntidadesA);
+  return oportunidadesRepo.update(id, { ...camposActualizacion, ...motivo } as any, reasignarEntidadesA);
 }
 
 export function tableroEmbudo(actor: Actor) {
@@ -171,7 +186,8 @@ export async function cambiarEtapa(params: {
   // Presente cuando el pedido viene de la ruta: verifica que pueda moverla.
   actor?: Actor;
   observacion?: string;
-  motivoPerdida?: string;
+  motivoPerdidaId?: number;
+  motivoPerdidaDetalle?: string;
   motivoBaja?: string;
   // Estado con el que queda el contacto/empresa al pasar a Inscripción
   // cancelada. Por defecto INACTIVO; la baja desde Contactos/Empresas puede
@@ -184,6 +200,7 @@ export async function cambiarEtapa(params: {
 
   const etapaNueva = await prisma.etapa.findUnique({ where: { id: params.etapaNuevaId } });
   if (!etapaNueva) throw ApiError.notFound("Etapa no encontrada");
+  if (!etapaNueva.activo) throw etapaDesactivada(etapaNueva.nombre);
 
   // Regla de negocio: a Inscripción cancelada solo se puede llegar desde Inscripto (la única
   // etapa GANADA), sin importar cuántas etapas GANADA/PERDIDA distintas haya
@@ -205,9 +222,13 @@ export async function cambiarEtapa(params: {
     throw ApiError.badRequest("La oportunidad ya está cerrada, no puede cambiar de etapa");
   }
 
-  if (etapaNueva.tipo == "PERDIDA" && !params.motivoPerdida) {
-    throw ApiError.badRequest("Hay que indicar un motivo para cerrar la oportunidad");
-  }
+  const motivoPerdida =
+    etapaNueva.tipo === "PERDIDA"
+      ? params.motivoPerdidaId
+        ? await catalogosService.validarSeleccion("motivos-perdida", params.motivoPerdidaId)
+        : undefined
+      : undefined;
+  if (etapaNueva.tipo === "PERDIDA" && !motivoPerdida) throw ApiError.badRequest(MOTIVO_OBLIGATORIO);
 
   if (etapaNueva.esClasePrueba) {
     if (oportunidad.contacto?.bajaDefinitiva) {
@@ -233,8 +254,10 @@ export async function cambiarEtapa(params: {
   } else if (etapaNueva.tipo === "PERDIDA") {
     camposDerivados.estado = "PERDIDA";
     camposDerivados.fechaRealCierre = new Date();
-    camposDerivados.motivoPerdida = params.motivoPerdida;
-    observacionHistorial = [params.observacion, `Motivo de pérdida: ${params.motivoPerdida}`]
+    camposDerivados.motivoPerdidaId = motivoPerdida!.id;
+    camposDerivados.motivoPerdidaDetalle = params.motivoPerdidaDetalle || null;
+    const motivoTexto = [motivoPerdida!.nombre, params.motivoPerdidaDetalle].filter(Boolean).join(" — ");
+    observacionHistorial = [params.observacion, `Motivo de pérdida: ${motivoTexto}`]
       .filter(Boolean)
       .join(" — ");
   } else if (etapaNueva.tipo === "BAJA") {

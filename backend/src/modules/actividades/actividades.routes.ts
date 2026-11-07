@@ -31,13 +31,3 @@ actividadesRouter.post(
     res.status(201).json(await actividadesService.registrar(data, req.user!));
   })
 );
-
-export const tiposActividadRouter = Router();
-tiposActividadRouter.use(requireAuth);
-
-tiposActividadRouter.get(
-  "/",
-  asyncHandler(async (_req, res) => {
-    res.json(await actividadesService.tiposActivos());
-  })
-);
