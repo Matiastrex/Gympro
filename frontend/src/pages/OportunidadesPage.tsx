@@ -4,7 +4,7 @@ import { Modal } from "../components/Modal";
 import { Badge } from "../components/Badge";
 import { Avatar } from "../components/Avatar";
 import { PencilIcon, SearchIcon } from "../components/icons";
-import { HistorialEtapas, HistorialEtapaItem } from "../components/HistorialEtapas";
+import { HistorialComercial } from "../components/HistorialComercial";
 import { ResponsableSelect } from "../components/ResponsableSelect";
 
 interface Opcion {
@@ -36,7 +36,6 @@ interface Oportunidad {
 }
 
 interface OportunidadDetalle extends Oportunidad {
-  historialEtapas: HistorialEtapaItem[];
 }
 
 // Un vendedor solo recibe sus propios contactos/empresas. Si se le reasignó
@@ -343,7 +342,7 @@ export function OportunidadesPage() {
       )}
 
       {detalle && (
-        <Modal title={detalle.titulo} onClose={() => setDetalle(null)}>
+        <Modal title={detalle.titulo} onClose={() => setDetalle(null)} width={640}>
           <dl className="detail-grid">
             <div className="detail-item">
               <dt>Estado</dt>
@@ -378,10 +377,7 @@ export function OportunidadesPage() {
               <p>{detalle.observaciones}</p>
             </div>
           )}
-          <div className="detail-section">
-            <h4>Historial de etapas ({detalle.historialEtapas.length})</h4>
-            <HistorialEtapas items={detalle.historialEtapas} />
-          </div>
+          <HistorialComercial entidad={{ oportunidadId: detalle.id }} nombreEntidad={detalle.titulo} />
         </Modal>
       )}
     </div>

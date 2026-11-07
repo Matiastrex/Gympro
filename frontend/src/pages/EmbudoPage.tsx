@@ -3,7 +3,7 @@ import { api } from "../api/client";
 import { Modal } from "../components/Modal";
 import { Avatar } from "../components/Avatar";
 import { Badge } from "../components/Badge";
-import { HistorialEtapas, HistorialEtapaItem } from "../components/HistorialEtapas";
+import { HistorialComercial } from "../components/HistorialComercial";
 
 interface Etapa {
   id: number;
@@ -36,7 +36,6 @@ interface OportunidadDetalle extends Oportunidad {
   etapa: { nombre: string };
   producto?: { nombre: string } | null;
   observaciones?: string | null;
-  historialEtapas: HistorialEtapaItem[];
 }
 
 export function EmbudoPage() {
@@ -318,7 +317,7 @@ export function EmbudoPage() {
       )}
 
       {detalle && (
-        <Modal title={detalle.titulo} onClose={() => setDetalle(null)}>
+        <Modal title={detalle.titulo} onClose={() => setDetalle(null)} width={640}>
           <dl className="detail-grid">
             <div className="detail-item">
               <dt>Estado</dt>
@@ -353,10 +352,7 @@ export function EmbudoPage() {
               <p>{detalle.observaciones}</p>
             </div>
           )}
-          <div className="detail-section">
-            <h4>Historial de etapas ({detalle.historialEtapas.length})</h4>
-            <HistorialEtapas items={detalle.historialEtapas} />
-          </div>
+          <HistorialComercial entidad={{ oportunidadId: detalle.id }} nombreEntidad={detalle.titulo} />
         </Modal>
       )}
     </div>

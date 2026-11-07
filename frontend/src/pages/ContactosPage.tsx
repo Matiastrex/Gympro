@@ -5,6 +5,7 @@ import { Badge } from "../components/Badge";
 import { Avatar } from "../components/Avatar";
 import { BajaModal } from "../components/BajaModal";
 import { ResponsableSelect } from "../components/ResponsableSelect";
+import { HistorialComercial } from "../components/HistorialComercial";
 import { useAuth } from "../context/AuthContext";
 import { veTodo } from "../constants/roles";
 import { BajaIcon, PencilIcon, SearchIcon } from "../components/icons";
@@ -356,10 +357,7 @@ export function ContactosPage() {
       )}
 
       {detalle && (
-        <Modal
-          title={`${detalle.nombre} ${detalle.apellido}`}
-          onClose={() => setDetalle(null)}
-        >
+        <Modal title={`${detalle.nombre} ${detalle.apellido}`} onClose={() => setDetalle(null)} width={640}>
           <dl className="detail-grid">
             <div className="detail-item">
               <dt>Estado</dt>
@@ -410,6 +408,11 @@ export function ContactosPage() {
               {detalle.oportunidades.length === 0 && <p className="cell-muted">Sin oportunidades asociadas</p>}
             </div>
           </div>
+          <HistorialComercial
+            entidad={{ contactoId: detalle.id }}
+            nombreEntidad={`${detalle.nombre} ${detalle.apellido}`}
+            motivoSoloLectura={motivoSoloLectura(detalle)}
+          />
         </Modal>
       )}
     </div>

@@ -1,4 +1,4 @@
-import { Rol } from "@prisma/client";
+import { Prisma, Rol } from "@prisma/client";
 import { prisma } from "../config/db";
 import { ApiError } from "./apiError";
 import { JwtPayload } from "./jwt";
@@ -28,7 +28,22 @@ export function alcanceConCreador(actor: Actor): { OR?: [{ responsableId: number
   return veTodo(actor) ? {} : { OR: [{ responsableId: actor.userId }, { creadoPorId: actor.userId }] };
 }
 
-type Asignable = { responsableId: number | null; creadoPorId?: number | null };
+// Listado de actividades: el vendedor ve las que registró y las de los
+// registros que tiene asignados (aunque las haya cargado otro).
+export function alcanceActividades(actor: Actor): Prisma.ActividadWhereInput {
+  if (veTodo(actor)) return {};
+  const propio = { responsableId: actor.userId };
+  return {
+    OR: [
+      { usuarioId: actor.userId },
+      { contacto: propio },
+      { empresa: propio },
+      { oportunidad: propio },
+    ],
+  };
+}
+
+type Asignable ={ responsableId: number | null; creadoPorId?: number | null };
 
 // "ver" incluye a quien creó el registro (solo lectura); "editar" exige ser
 // el responsable actual.

@@ -8,6 +8,7 @@ import { OportunidadesPage } from "./pages/OportunidadesPage";
 import { ContactosPage } from "./pages/ContactosPage";
 import { EmpresasPage } from "./pages/EmpresasPage";
 import { UsuariosPage } from "./pages/UsuariosPage";
+import { ActividadesPage } from "./pages/ActividadesPage";
 
 function AppLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -56,6 +57,14 @@ export default function App() {
           element={
             <AppLayout>
               <EmpresasPage />
+            </AppLayout>
+          }
+        />
+        <Route
+          path="/actividades"
+          element={
+            <AppLayout>
+              <ActividadesPage />
             </AppLayout>
           }
         />

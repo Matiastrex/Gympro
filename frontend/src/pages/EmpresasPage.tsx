@@ -7,6 +7,7 @@ import { ResponsableSelect } from "../components/ResponsableSelect";
 import { useAuth } from "../context/AuthContext";
 import { veTodo } from "../constants/roles";
 import { BajaModal } from "../components/BajaModal";
+import { HistorialComercial } from "../components/HistorialComercial";
 import { BajaIcon, PencilIcon, SearchIcon } from "../components/icons";
 
 interface Empresa {
@@ -313,7 +314,7 @@ export function EmpresasPage() {
       )}
 
       {detalle && (
-        <Modal title={detalle.razonSocial} onClose={() => setDetalle(null)}>
+        <Modal title={detalle.razonSocial} onClose={() => setDetalle(null)} width={640}>
           <dl className="detail-grid">
             <div className="detail-item">
               <dt>Estado</dt>
@@ -377,6 +378,11 @@ export function EmpresasPage() {
               {detalle.oportunidades.length === 0 && <p className="cell-muted">Sin oportunidades asociadas</p>}
             </div>
           </div>
+          <HistorialComercial
+            entidad={{ empresaId: detalle.id }}
+            nombreEntidad={detalle.razonSocial}
+            motivoSoloLectura={motivoSoloLectura(detalle)}
+          />
         </Modal>
       )}
     </div>

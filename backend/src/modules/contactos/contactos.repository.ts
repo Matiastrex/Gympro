@@ -28,7 +28,6 @@ export function findById(id: number) {
       empresa: true,
       responsable: { select: { id: true, nombre: true, apellido: true } },
       oportunidades: { include: { etapa: true } },
-      actividades: { orderBy: { fecha: "desc" } },
     },
   });
 }

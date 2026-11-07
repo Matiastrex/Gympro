@@ -104,3 +104,100 @@ export function CloseIcon(props: IconProps) {
     </svg>
   );
 }
+
+// ---------- Actividades ----------
+
+export function ActividadIcon(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <rect x="5" y="4" width="14" height="17" rx="2" />
+      <path d="M9 4V3h6v1" />
+      <path d="M8.5 11.5l2 2 4-4" />
+      <path d="M8.5 17h7" />
+    </svg>
+  );
+}
+
+export function PhoneIcon(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M6.5 3.5h2.8l1.4 4-2 1.3a10 10 0 0 0 6.5 6.5l1.3-2 4 1.4v2.8a2 2 0 0 1-2.2 2A16.5 16.5 0 0 1 4.5 5.7a2 2 0 0 1 2-2.2Z" />
+    </svg>
+  );
+}
+
+export function MailIcon(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <rect x="3.5" y="5.5" width="17" height="13" rx="2" />
+      <path d="m4 7 8 6 8-6" />
+    </svg>
+  );
+}
+
+export function ChatIcon(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M4.5 19.5l1.2-3.6A7.5 7.5 0 1 1 8.4 18.6L4.5 19.5Z" />
+      <path d="M9 11.5h.01M12 11.5h.01M15 11.5h.01" />
+    </svg>
+  );
+}
+
+export function DoorIcon(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M6 20.5V4.5a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v16" />
+      <path d="M3.5 20.5h17" />
+      <path d="M14.5 12.5h.01" />
+    </svg>
+  );
+}
+
+export function VideoIcon(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <rect x="3.5" y="6.5" width="12" height="11" rx="2" />
+      <path d="m15.5 10.5 5-3v9l-5-3" />
+    </svg>
+  );
+}
+
+export function DumbbellIcon(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M8 12h8" />
+      <rect x="4.5" y="7.5" width="3.5" height="9" rx="1" />
+      <rect x="16" y="7.5" width="3.5" height="9" rx="1" />
+      <path d="M2.5 10v4M21.5 10v4" />
+    </svg>
+  );
+}
+
+export function PropuestaIcon(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M6.5 3.5h7l4 4v13h-11Z" />
+      <path d="M13.5 3.5v4h4" />
+      <path d="M9 12.5h6M9 16h4" />
+    </svg>
+  );
+}
+
+export function NotaIcon(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M4.5 4.5h15v10l-5 5h-10Z" />
+      <path d="M14.5 19.5v-5h5" />
+      <path d="M8 9h8" />
+    </svg>
+  );
+}
+
+export function PuntoIcon(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <circle cx="12" cy="12" r="3" />
+    </svg>
+  );
+}

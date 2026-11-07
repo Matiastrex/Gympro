@@ -33,7 +33,6 @@ export function findById(id: number) {
         },
         orderBy: { fecha: "desc" },
       },
-      actividades: { orderBy: { fecha: "desc" } },
     },
   });
 }

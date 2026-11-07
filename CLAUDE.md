@@ -105,10 +105,27 @@ rol (it feeds the responsable selects) and returns only active usuarios; `?inclu
 honored for admins only. On the frontend, `constants/roles.ts` holds the `Rol` type and labels;
 `ProtectedRoute` accepts `roles` and the Sidebar's links can declare `roles` to hide themselves.
 
+Actividades (`modules/actividades`, page `ActividadesPage.tsx`) are past interactions — **immutable**:
+only `POST /api/actividades` and reads, no PUT/DELETE. Rules in `actividades.service.ts`:
+- `tipoActividadId` points to the configurable `TipoActividad` catalog (`GET /api/tipos-actividad`,
+  active ones only; deactivate with `activo: false`, never delete). `fecha` can't be in the future
+  (agenda/tareas are out of scope) and `usuarioId` is always the actor.
+- Must link a contacto, empresa and/or oportunidad. From an oportunidad, its contacto/empresa are
+  copied onto the actividad; a contacto with convenio adds its empresa. That's what makes it show up in
+  every related historial. Registering requires edit access (responsable) on what it links to.
+- `GET /api/actividades` is paginated (`utils/paginacion.ts`: `page`/`pageSize` → `Paginado<T>`), with
+  filters `tipoActividadId`, `usuarioId`, `desde`, `hasta`, `q`. A VENDEDOR sees what they registered plus
+  activity on records they're responsable for (`alcanceActividades` in `permisos.ts`).
+- `GET /api/actividades/historial?contactoId=|empresaId=|oportunidadId=` (exactly one, `RefEntidad`)
+  returns the merged timeline: `{ kind: "actividad" | "etapa", fecha, ... }` sorted newest first. An
+  empresa's historial includes its contactos' activity. Frontend: `components/HistorialComercial.tsx`
+  (used in the contacto, empresa, oportunidad and embudo detail modals) and `ActividadForm.tsx`; shared
+  types in `src/types/actividades.ts`.
+
 ### Data model is ahead of the current API/UI on purpose
 
 `backend/prisma/schema.prisma` already models the full domain the final delivery ("Entrega Final")
-needs — `Actividad`, `HistorialEtapa`, `Usuario.rol` — even though the current MVP only exposes a
+needs — e.g. `Usuario.rol`, `Oportunidad.probabilidadCierre` — even though the current MVP only exposes a
 subset through routes/pages. When extending scope, prefer wiring up existing schema/fields over
 adding new ones; check the schema before assuming a table/column doesn't exist.
 
@@ -167,8 +184,8 @@ via `localStorage`). `src/api/client.ts` is a single Axios instance: it attaches
 `localStorage` on every request and force-redirects to `/login` on a 401 response. Pages
 (`src/pages/*.tsx`) call the API directly through this client — there's no separate API-hooks layer.
 
-The frontend has pages for empresas, contactos, oportunidades, the embudo board, and usuarios (admin
-only).
+The frontend has pages for empresas, contactos, oportunidades, the embudo board, actividades, and
+usuarios (admin only).
 
 ## Known bugs to fix
 

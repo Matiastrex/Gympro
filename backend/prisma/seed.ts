@@ -64,6 +64,22 @@ async function main() {
     }
   }
 
+  // ---------- Tipos de actividad (configurables por el administrador) ----------
+  const tiposActividad = [
+    "Llamada",
+    "Correo electrónico",
+    "Mensaje / WhatsApp",
+    "Visita al gimnasio",
+    "Reunión virtual",
+    "Clase de prueba",
+    "Envío de propuesta de membresía",
+    "Nota interna",
+  ];
+  for (const [i, nombre] of tiposActividad.entries()) {
+    await prisma.tipoActividad.upsert({ where: { nombre }, update: {}, create: { nombre, orden: i + 1 } });
+  }
+  await prisma.tipoActividad.upsert({ where: { nombre: "Otro" }, update: {}, create: { nombre: "Otro", orden: 99 } });
+
   console.log(
     "Seed completado. Usuarios de prueba (contraseña gympro123): " + usuarios.map((u) => u.email).join(", ")
   );

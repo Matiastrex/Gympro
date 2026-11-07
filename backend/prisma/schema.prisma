@@ -92,6 +92,7 @@ model Empresa {
 
   contactos     Contacto[]
   oportunidades Oportunidad[]
+  actividades   Actividad[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -207,12 +208,32 @@ model Oportunidad {
   @@map("oportunidades")
 }
 
-// ---------- Módulo 3: actividades e historial (modelado ya; UI en Entrega Final) ----------
+// ---------- Módulo 3: actividades e historial comercial ----------
 
+// Catálogo configurable de tipos de actividad (Llamada, Visita al gimnasio...).
+// Se desactiva con `activo: false` en vez de borrarse: las actividades viejas
+// siguen apuntando a su tipo.
+model TipoActividad {
+  id     Int     @id @default(autoincrement())
+  nombre String  @unique
+  orden  Int     @default(0)
+  activo Boolean @default(true)
+
+  actividades Actividad[]
+
+  @@map("tipos_actividad")
+}
+
+// Una interacción que YA ocurrió (no es una tarea ni un recordatorio): no se
+// edita ni se borra. Se relaciona con un contacto, una empresa y/o una
+// oportunidad; al registrarla desde una oportunidad se completan su
+// contacto/empresa para que aparezca en todos los historiales.
 model Actividad {
-  id     Int      @id @default(autoincrement())
-  tipo   String
-  fecha  DateTime @default(now())
+  id    Int      @id @default(autoincrement())
+  fecha DateTime @default(now()) // cuándo ocurrió
+
+  tipoActividadId Int
+  tipoActividad   TipoActividad @relation(fields: [tipoActividadId], references: [id])
 
   usuarioId Int
   usuario   Usuario @relation(fields: [usuarioId], references: [id])
@@ -220,12 +241,18 @@ model Actividad {
   contactoId Int?
   contacto   Contacto? @relation(fields: [contactoId], references: [id])
 
+  empresaId Int?
+  empresa   Empresa? @relation(fields: [empresaId], references: [id])
+
   oportunidadId Int?
   oportunidad   Oportunidad? @relation(fields: [oportunidadId], references: [id])
 
-  descripcion String? @db.Text
+  descripcion String  @db.Text
   resultado   String?
 
+  createdAt DateTime @default(now()) // cuándo se cargó
+
+  @@index([fecha])
   @@map("actividades")
 }
 

@@ -123,7 +123,7 @@ async function main() {
       return oportunidad;
     };
 
-    await crearOportunidad({
+    const opJuan = await crearOportunidad({
       titulo: "Consulta de Juan Pérez por musculación",
       contactoId: juan.id,
       productoId: producto("Musculación mensual").id,
@@ -138,7 +138,7 @@ async function main() {
       ],
     });
 
-    await crearOportunidad({
+    const opTextil = await crearOportunidad({
       titulo: "Convenio corporativo Textil del Oeste",
       empresaId: empresa.id,
       productoId: producto("Combo musculación + funcional").id,
@@ -183,9 +183,53 @@ async function main() {
         { etapaId: etapa("Perdida").id, observacion: "Informó que eligió otra opción." },
       ],
     });
+
+    // ---------- Actividades realizadas (historial comercial) ----------
+    const tipos = await tx.tipoActividad.findMany();
+    const tipo = (nombre: string) => {
+      const encontrado = tipos.find((item) => item.nombre === nombre);
+      if (!encontrado) throw new Error(`Falta el tipo de actividad ${nombre}. Ejecutá primero npm run prisma:seed.`);
+      return encontrado.id;
+    };
+    await tx.actividad.createMany({
+      data: [
+        {
+          tipoActividadId: tipo("Mensaje / WhatsApp"),
+          fecha: new Date("2026-09-10T14:30:00.000Z"),
+          descripcion: "Respondió la historia de Instagram preguntando precios de musculación.",
+          resultado: "Se le pasaron horarios y precios",
+          contactoId: juan.id,
+          oportunidadId: opJuan.id,
+        },
+        {
+          tipoActividadId: tipo("Llamada"),
+          fecha: new Date("2026-09-11T12:00:00.000Z"),
+          descripcion: "Llamada para coordinar la clase de prueba.",
+          resultado: "Clase de prueba agendada para el jueves 9 hs",
+          contactoId: juan.id,
+          oportunidadId: opJuan.id,
+        },
+        {
+          tipoActividadId: tipo("Visita al gimnasio"),
+          fecha: new Date("2026-09-10T16:00:00.000Z"),
+          descripcion: "Reunión con RRHH en la recepción para mostrar las instalaciones.",
+          resultado: "Pidieron propuesta para diez empleados",
+          contactoId: contactoCorporativo.id,
+          empresaId: empresa.id,
+          oportunidadId: opTextil.id,
+        },
+        {
+          tipoActividadId: tipo("Envío de propuesta de membresía"),
+          fecha: new Date("2026-09-11T18:00:00.000Z"),
+          descripcion: "Se envió por correo la propuesta de combo musculación + funcional con descuento corporativo.",
+          empresaId: empresa.id,
+          oportunidadId: opTextil.id,
+        },
+      ].map((actividad) => ({ ...actividad, usuarioId: admin.id })),
+    });
   });
 
-  console.log("Datos demo cargados: 1 empresa, 3 contactos y 4 oportunidades con historial.");
+  console.log("Datos demo cargados: 1 empresa, 3 contactos y 4 oportunidades con historial y actividades.");
 }
 
 main()
