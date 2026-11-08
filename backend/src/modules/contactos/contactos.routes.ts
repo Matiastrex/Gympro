@@ -9,8 +9,8 @@ contactosRouter.use(requireAuth);
 contactosRouter.get(
   "/",
   asyncHandler(async (req, res) => {
-    const filtro = typeof req.query.q === "string" ? req.query.q : undefined;
-    res.json(await contactosService.listar(req.user!, filtro));
+    const filtros = contactosService.listadoSchema.parse(req.query);
+    res.json(await contactosService.listar(filtros, req.user!));
   })
 );
 

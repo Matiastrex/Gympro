@@ -1,10 +1,13 @@
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useState } from "react";
 import { api } from "../api/client";
 import { Modal } from "../components/Modal";
-import { Badge } from "../components/Badge";
+import { Badge, ESTADO_LABEL } from "../components/Badge";
+import { Paginacion } from "../components/Paginacion";
+import { useListadoPaginado } from "../hooks/useListadoPaginado";
+import { useEquipo } from "../hooks/useEquipo";
 import { Avatar } from "../components/Avatar";
 import { ResponsableSelect } from "../components/ResponsableSelect";
-import { CatalogoSelect } from "../components/CatalogoSelect";
+import { CatalogoSelect, useCatalogo } from "../components/CatalogoSelect";
 import type { RefCatalogo } from "../types/configuracion";
 import { useAuth } from "../context/AuthContext";
 import { veTodo } from "../constants/roles";
@@ -37,6 +40,8 @@ interface EmpresaDetalle extends Empresa {
 
 const ESTADOS = ["POTENCIAL", "CLIENTE", "INACTIVO", "NO_CONTACTAR"];
 
+const filtrosVacios = { estado: "", responsableId: "", origenId: "" };
+
 const formVacio = {
   razonSocial: "",
   cuit: "",
@@ -53,28 +58,17 @@ const formVacio = {
 
 export function EmpresasPage() {
   const { usuario } = useAuth();
-  const [empresas, setEmpresas] = useState<Empresa[]>([]);
-  const [search, setSearch] = useState("");
+  const verEquipo = veTodo(usuario?.rol);
+  const listado = useListadoPaginado<Empresa, typeof filtrosVacios>("/empresas", filtrosVacios);
+  const { filtros, cambiar } = listado;
+  const equipo = useEquipo(verEquipo);
+  const origenes = useCatalogo("origenes");
   const [form, setForm] = useState(formVacio);
   const [error, setError] = useState<string | null>(null);
   const [mostrarForm, setMostrarForm] = useState(false);
   const [editando, setEditando] = useState<Empresa | null>(null);
   const [detalle, setDetalle] = useState<EmpresaDetalle | null>(null);
   const [dandoDeBaja, setDandoDeBaja] = useState<Empresa | null>(null);
-
-  async function cargar(q?: string) {
-    const res = await api.get("/empresas", { params: q ? { q } : undefined });
-    setEmpresas(res.data);
-  }
-
-  useEffect(() => {
-    cargar();
-  }, []);
-
-  useEffect(() => {
-    const t = setTimeout(() => cargar(search || undefined), 250);
-    return () => clearTimeout(t);
-  }, [search]);
 
   function abrirCreacion() {
     setForm(formVacio);
@@ -110,7 +104,7 @@ export function EmpresasPage() {
     if (!dandoDeBaja) return;
     await api.post(`/empresas/${dandoDeBaja.id}/baja`, { contactarNuevamente, motivoBaja });
     setDandoDeBaja(null);
-    await cargar(search || undefined);
+    listado.recargar();
   }
 
   // Un vendedor ve también lo que cargó y después se reasignó a otro, pero
@@ -149,7 +143,7 @@ export function EmpresasPage() {
         await api.post("/empresas", payload);
         setMostrarForm(false);
       }
-      await cargar(search || undefined);
+      listado.recargar();
     } catch (err: any) {
       setError(err.response?.data?.error ?? "No se pudo guardar la empresa");
     }
@@ -169,9 +163,10 @@ export function EmpresasPage() {
           <div className="search-input">
             <SearchIcon />
             <input
-              placeholder="Buscar por razón social o email"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Buscar por razón social, CUIT o email"
+              value={listado.busqueda}
+              onChange={(e) => listado.setBusqueda(e.target.value)}
+              aria-label="Buscar empresas"
             />
           </div>
           <button className="btn" onClick={abrirCreacion}>
@@ -180,7 +175,49 @@ export function EmpresasPage() {
         </div>
       </div>
 
-      <div className="card table-card">
+      <div className="filters-bar">
+        <select className="filter-select" value={filtros.estado} onChange={(e) => cambiar("estado", e.target.value)} aria-label="Estado">
+          <option value="">Todos los estados</option>
+          {ESTADOS.map((es) => (
+            <option key={es} value={es}>
+              {ESTADO_LABEL[es]}
+            </option>
+          ))}
+        </select>
+        {verEquipo && (
+          <select
+            className="filter-select"
+            value={filtros.responsableId}
+            onChange={(e) => cambiar("responsableId", e.target.value)}
+            aria-label="Responsable"
+          >
+            <option value="">Todos los responsables</option>
+            {equipo.map((u) => (
+              <option key={u.id} value={u.id}>
+                {u.nombre} {u.apellido}
+              </option>
+            ))}
+          </select>
+        )}
+        <select className="filter-select" value={filtros.origenId} onChange={(e) => cambiar("origenId", e.target.value)} aria-label="Origen">
+          <option value="">Todos los orígenes</option>
+          {origenes.map((o) => (
+            <option key={o.id} value={o.id}>
+              {o.nombre}
+            </option>
+          ))}
+        </select>
+        {listado.hayFiltros && (
+          <button type="button" className="link-btn" onClick={listado.limpiar}>
+            Limpiar filtros
+          </button>
+        )}
+      </div>
+
+      {listado.error && <div className="error-box">{listado.error}</div>}
+
+      <div className="card">
+        <div className="table-card">
         <table>
           <thead>
             <tr>
@@ -193,7 +230,7 @@ export function EmpresasPage() {
             </tr>
           </thead>
           <tbody>
-            {empresas.map((emp) => (
+            {listado.items.map((emp) => (
               <tr key={emp.id} onClick={() => abrirDetalle(emp.id)}>
                 <td className="cell-primary">{emp.razonSocial}</td>
                 <td className="cell-muted">{emp.email || "—"}</td>
@@ -235,15 +272,17 @@ export function EmpresasPage() {
                 </td>
               </tr>
             ))}
-            {empresas.length === 0 && (
+            {listado.cargado && listado.items.length === 0 && (
               <tr className="row-empty">
                 <td colSpan={6} className="empty-state">
-                  Todavía no hay empresas cargadas
+                  {listado.hayFiltros ? "Ninguna empresa coincide con estos filtros." : "Todavía no hay empresas cargadas"}
                 </td>
               </tr>
             )}
           </tbody>
         </table>
+        </div>
+        <Paginacion total={listado.total} page={listado.page} pageSize={listado.pageSize} onPage={listado.setPage} />
       </div>
 
       {formActivo && (

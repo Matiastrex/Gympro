@@ -24,3 +24,13 @@ export function skipTake({ page, pageSize }: Paginacion) {
 export function paginado<T>(items: T[], total: number, { page, pageSize }: Paginacion): Paginado<T> {
   return { items, total, page, pageSize };
 }
+
+// Listados que también alimentan selects: sin `page` devuelven el array
+// completo; con `page`, una página como `Paginado<T>`.
+export const paginacionOpcionalSchema = z.object({
+  page: z.coerce.number().int().min(1).optional(),
+  pageSize: z.coerce.number().int().min(1).max(100).default(20),
+});
+
+// Query string de un id opcional (`?responsableId=3`).
+export const idQuery = z.coerce.number().int().positive().optional();

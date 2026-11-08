@@ -11,9 +11,8 @@ oportunidadesRouter.use(requireAuth);
 oportunidadesRouter.get(
   "/",
   asyncHandler(async (req, res) => {
-    const etapaId = req.query.etapaId ? Number(req.query.etapaId) : undefined;
-    const responsableId = req.query.responsableId ? Number(req.query.responsableId) : undefined;
-    res.json(await oportunidadesService.listar({ etapaId, responsableId }, req.user!));
+    const filtros = oportunidadesService.listadoSchema.parse(req.query);
+    res.json(await oportunidadesService.listar(filtros, req.user!));
   })
 );
 

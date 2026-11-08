@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { api } from "../api/client";
 import { Modal } from "../components/Modal";
+import { Paginacion } from "../components/Paginacion";
 import { ActividadForm } from "../components/ActividadForm";
 import { TipoActividadIcon } from "../components/TipoActividadIcon";
 import { SearchIcon } from "../components/icons";
@@ -102,9 +103,6 @@ export function ActividadesPage() {
 
   const hayFiltros = busqueda !== "" || Object.entries(filtros).some(([k, v]) => k !== "q" && v !== "");
   const total = datos?.total ?? 0;
-  const paginas = Math.max(1, Math.ceil(total / PAGE_SIZE));
-  const desdeItem = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
-  const hastaItem = Math.min(page * PAGE_SIZE, total);
 
   return (
     <div className="container">
@@ -238,21 +236,7 @@ export function ActividadesPage() {
           </tbody>
         </table>
         </div>
-        {total > 0 && (
-          <div className="pagination">
-            <span>
-              {desdeItem}–{hastaItem} de {total}
-            </span>
-            <div className="pagination-controls">
-              <button className="btn secondary btn-sm" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
-                Anterior
-              </button>
-              <button className="btn secondary btn-sm" disabled={page >= paginas} onClick={() => setPage((p) => p + 1)}>
-                Siguiente
-              </button>
-            </div>
-          </div>
-        )}
+        <Paginacion total={total} page={page} pageSize={PAGE_SIZE} onPage={setPage} />
       </div>
 
       {registrando && (

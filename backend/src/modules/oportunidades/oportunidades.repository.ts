@@ -1,5 +1,6 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "../../config/db";
+import { Paginacion, skipTake } from "../../utils/paginacion";
 
 const includeCompleto = {
   empresa: { select: { id: true, razonSocial: true, bajaDefinitiva: true } },
@@ -11,15 +12,18 @@ const includeCompleto = {
   motivoPerdida: { select: { id: true, nombre: true } },
 } satisfies Prisma.OportunidadInclude;
 
-export function findAll(filtros: { etapaId?: number; responsableId?: number }) {
-  return prisma.oportunidad.findMany({
-    where: {
-      etapaId: filtros.etapaId,
-      responsableId: filtros.responsableId,
-    },
-    include: includeCompleto,
-    orderBy: { updatedAt: "desc" },
-  });
+const ordenListado = [{ updatedAt: "desc" }, { id: "desc" }] satisfies Prisma.OportunidadOrderByWithRelationInput[];
+
+export function findAll(where: Prisma.OportunidadWhereInput) {
+  return prisma.oportunidad.findMany({ where, include: includeCompleto, orderBy: ordenListado });
+}
+
+export async function findPaginado(where: Prisma.OportunidadWhereInput, paginacion: Paginacion) {
+  const [items, total] = await prisma.$transaction([
+    prisma.oportunidad.findMany({ where, include: includeCompleto, orderBy: ordenListado, ...skipTake(paginacion) }),
+    prisma.oportunidad.count({ where }),
+  ]);
+  return { items, total };
 }
 
 export function findById(id: number) {

@@ -10,12 +10,7 @@ export type RefEntidad = ExactlyOne<{ contactoId: number; empresaId: number; opo
 
 export type TipoEntidad = "contacto" | "empresa" | "oportunidad";
 
-export interface Paginado<T> {
-  items: T[];
-  total: number;
-  page: number;
-  pageSize: number;
-}
+export type { Paginado } from "./paginacion";
 
 export interface TipoActividad {
   id: number;

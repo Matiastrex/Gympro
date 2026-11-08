@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { Prisma } from "@prisma/client";
+import { idQuery, paginacionOpcionalSchema, paginado } from "../../utils/paginacion";
 import { ApiError } from "../../utils/apiError";
 import * as empresasRepo from "./empresas.repository";
 import * as oportunidadesService from "../oportunidades/oportunidades.service";
@@ -26,8 +28,36 @@ export const bajaSchema = z.object({
   motivoBaja: z.string().optional(),
 });
 
-export function listar(actor: Actor, filtro?: string) {
-  return empresasRepo.findAll({ filtro, visibilidad: alcanceConCreador(actor) });
+export const listadoSchema = paginacionOpcionalSchema.extend({
+  q: z.string().trim().optional(),
+  estado: z.enum(["POTENCIAL", "CLIENTE", "INACTIVO", "NO_CONTACTAR"]).optional(),
+  responsableId: idQuery,
+  origenId: idQuery,
+});
+
+export type FiltrosEmpresas = z.infer<typeof listadoSchema>;
+
+// La visibilidad del rol va en su propio AND: un filtro no puede ampliarla.
+export async function listar(filtros: FiltrosEmpresas, actor: Actor) {
+  const { page, pageSize, q, estado, responsableId, origenId } = filtros;
+  const where: Prisma.EmpresaWhereInput = {
+    AND: [
+      alcanceConCreador(actor),
+      { estado, responsableId, origenId },
+      q
+        ? {
+            OR: [
+              { razonSocial: { contains: q } },
+              { cuit: { contains: q } },
+              { email: { contains: q } },
+            ],
+          }
+        : {},
+    ],
+  };
+  if (!page) return empresasRepo.findAll(where);
+  const { items, total } = await empresasRepo.findPaginado(where, { page, pageSize });
+  return paginado(items, total, { page, pageSize });
 }
 
 export async function obtener(id: number, actor: Actor, modo: Modo = "editar") {

@@ -1,11 +1,14 @@
 import { FormEvent, useEffect, useState } from "react";
 import { api } from "../api/client";
 import { Modal } from "../components/Modal";
-import { Badge } from "../components/Badge";
+import { Badge, ESTADO_LABEL } from "../components/Badge";
+import { Paginacion } from "../components/Paginacion";
+import { useListadoPaginado } from "../hooks/useListadoPaginado";
+import { useEquipo } from "../hooks/useEquipo";
 import { Avatar } from "../components/Avatar";
 import { BajaModal } from "../components/BajaModal";
 import { ResponsableSelect } from "../components/ResponsableSelect";
-import { CatalogoSelect } from "../components/CatalogoSelect";
+import { CatalogoSelect, useCatalogo } from "../components/CatalogoSelect";
 import type { RefCatalogo } from "../types/configuracion";
 import { HistorialComercial } from "../components/HistorialComercial";
 import { useAuth } from "../context/AuthContext";
@@ -43,6 +46,8 @@ interface ContactoDetalle extends Contacto {
 
 const ESTADOS = ["POTENCIAL", "CLIENTE", "INACTIVO", "NO_CONTACTAR"];
 
+const filtrosVacios = { estado: "", responsableId: "", origenId: "", empresaId: "" };
+
 const formVacio = {
   nombre: "",
   apellido: "",
@@ -59,9 +64,13 @@ const formVacio = {
 
 export function ContactosPage() {
   const { usuario } = useAuth();
-  const [contactos, setContactos] = useState<Contacto[]>([]);
+  const verEquipo = veTodo(usuario?.rol);
+  const listado = useListadoPaginado<Contacto, typeof filtrosVacios>("/contactos", filtrosVacios);
+  const { filtros, cambiar } = listado;
+  const equipo = useEquipo(verEquipo);
+  const origenes = useCatalogo("origenes");
+  // Todas las empresas visibles (sin paginar): alimentan el filtro y el select del formulario.
   const [empresas, setEmpresas] = useState<Empresa[]>([]);
-  const [search, setSearch] = useState("");
   const [form, setForm] = useState(formVacio);
   const [error, setError] = useState<string | null>(null);
   const [mostrarForm, setMostrarForm] = useState(false);
@@ -69,23 +78,9 @@ export function ContactosPage() {
   const [detalle, setDetalle] = useState<ContactoDetalle | null>(null);
   const [dandoDeBaja, setDandoDeBaja] = useState<Contacto | null>(null);
 
-  async function cargar(q?: string) {
-    const [resContactos, resEmpresas] = await Promise.all([
-      api.get("/contactos", { params: q ? { q } : undefined }),
-      api.get("/empresas"),
-    ]);
-    setContactos(resContactos.data);
-    setEmpresas(resEmpresas.data);
-  }
-
   useEffect(() => {
-    cargar();
+    api.get<Empresa[]>("/empresas").then((res) => setEmpresas(res.data));
   }, []);
-
-  useEffect(() => {
-    const t = setTimeout(() => cargar(search || undefined), 250);
-    return () => clearTimeout(t);
-  }, [search]);
 
   function abrirCreacion() {
     setForm(formVacio);
@@ -121,7 +116,7 @@ export function ContactosPage() {
     if (!dandoDeBaja) return;
     await api.post(`/contactos/${dandoDeBaja.id}/baja`, { contactarNuevamente, motivoBaja });
     setDandoDeBaja(null);
-    await cargar(search || undefined);
+    listado.recargar();
   }
 
   // Un vendedor ve también lo que cargó y después se reasignó a otro, pero
@@ -163,7 +158,7 @@ export function ContactosPage() {
         await api.post("/contactos", payload);
         setMostrarForm(false);
       }
-      await cargar(search || undefined);
+      listado.recargar();
     } catch (err: any) {
       setError(err.response?.data?.error ?? "No se pudo guardar el contacto");
     }
@@ -194,7 +189,12 @@ export function ContactosPage() {
         <div className="toolbar">
           <div className="search-input">
             <SearchIcon />
-            <input placeholder="Buscar por nombre o email" value={search} onChange={(e) => setSearch(e.target.value)} />
+            <input
+              placeholder="Buscar por nombre, email o documento"
+              value={listado.busqueda}
+              onChange={(e) => listado.setBusqueda(e.target.value)}
+              aria-label="Buscar contactos"
+            />
           </div>
           <button className="btn" onClick={abrirCreacion}>
             + Nuevo contacto
@@ -202,7 +202,57 @@ export function ContactosPage() {
         </div>
       </div>
 
-      <div className="card table-card">
+      <div className="filters-bar">
+        <select className="filter-select" value={filtros.estado} onChange={(e) => cambiar("estado", e.target.value)} aria-label="Estado">
+          <option value="">Todos los estados</option>
+          {ESTADOS.map((es) => (
+            <option key={es} value={es}>
+              {ESTADO_LABEL[es]}
+            </option>
+          ))}
+        </select>
+        {verEquipo && (
+          <select
+            className="filter-select"
+            value={filtros.responsableId}
+            onChange={(e) => cambiar("responsableId", e.target.value)}
+            aria-label="Responsable"
+          >
+            <option value="">Todos los responsables</option>
+            {equipo.map((u) => (
+              <option key={u.id} value={u.id}>
+                {u.nombre} {u.apellido}
+              </option>
+            ))}
+          </select>
+        )}
+        <select className="filter-select" value={filtros.origenId} onChange={(e) => cambiar("origenId", e.target.value)} aria-label="Origen">
+          <option value="">Todos los orígenes</option>
+          {origenes.map((o) => (
+            <option key={o.id} value={o.id}>
+              {o.nombre}
+            </option>
+          ))}
+        </select>
+        <select className="filter-select" value={filtros.empresaId} onChange={(e) => cambiar("empresaId", e.target.value)} aria-label="Empresa">
+          <option value="">Todas las empresas</option>
+          {empresas.map((emp) => (
+            <option key={emp.id} value={emp.id}>
+              {emp.razonSocial}
+            </option>
+          ))}
+        </select>
+        {listado.hayFiltros && (
+          <button type="button" className="link-btn" onClick={listado.limpiar}>
+            Limpiar filtros
+          </button>
+        )}
+      </div>
+
+      {listado.error && <div className="error-box">{listado.error}</div>}
+
+      <div className="card">
+        <div className="table-card">
         <table>
           <thead>
             <tr>
@@ -216,7 +266,7 @@ export function ContactosPage() {
             </tr>
           </thead>
           <tbody>
-            {contactos.map((c) => (
+            {listado.items.map((c) => (
               <tr key={c.id} onClick={() => abrirDetalle(c.id)}>
                 <td>
                   <div className="cell-user">
@@ -266,15 +316,17 @@ export function ContactosPage() {
                 </td>
               </tr>
             ))}
-            {contactos.length === 0 && (
+            {listado.cargado && listado.items.length === 0 && (
               <tr className="row-empty">
                 <td colSpan={7} className="empty-state">
-                  Todavía no hay contactos cargados
+                  {listado.hayFiltros ? "Ningún contacto coincide con estos filtros." : "Todavía no hay contactos cargados"}
                 </td>
               </tr>
             )}
           </tbody>
         </table>
+        </div>
+        <Paginacion total={listado.total} page={listado.page} pageSize={listado.pageSize} onPage={listado.setPage} />
       </div>
 
       {formActivo && (

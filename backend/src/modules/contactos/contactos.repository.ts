@@ -1,25 +1,25 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "../../config/db";
+import { Paginacion, skipTake } from "../../utils/paginacion";
 
-export function findAll({ filtro, visibilidad }: { filtro?: string; visibilidad: Prisma.ContactoWhereInput }) {
-  return prisma.contacto.findMany({
-    where: {
-      AND: visibilidad,
-      OR: filtro
-        ? [
-            { nombre: { contains: filtro } },
-            { apellido: { contains: filtro } },
-            { email: { contains: filtro } },
-          ]
-        : undefined,
-    },
-    include: {
-      empresa: { select: { id: true, razonSocial: true } },
-      responsable: { select: { id: true, nombre: true, apellido: true } },
-      origen: { select: { id: true, nombre: true } },
-    },
-    orderBy: { apellido: "asc" },
-  });
+const includeListado = {
+  empresa: { select: { id: true, razonSocial: true } },
+  responsable: { select: { id: true, nombre: true, apellido: true } },
+  origen: { select: { id: true, nombre: true } },
+} satisfies Prisma.ContactoInclude;
+
+const ordenListado = [{ apellido: "asc" }, { nombre: "asc" }, { id: "asc" }] satisfies Prisma.ContactoOrderByWithRelationInput[];
+
+export function findAll(where: Prisma.ContactoWhereInput) {
+  return prisma.contacto.findMany({ where, include: includeListado, orderBy: ordenListado });
+}
+
+export async function findPaginado(where: Prisma.ContactoWhereInput, paginacion: Paginacion) {
+  const [items, total] = await prisma.$transaction([
+    prisma.contacto.findMany({ where, include: includeListado, orderBy: ordenListado, ...skipTake(paginacion) }),
+    prisma.contacto.count({ where }),
+  ]);
+  return { items, total };
 }
 
 export function findById(id: number) {

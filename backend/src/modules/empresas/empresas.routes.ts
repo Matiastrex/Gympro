@@ -9,8 +9,8 @@ empresasRouter.use(requireAuth);
 empresasRouter.get(
   "/",
   asyncHandler(async (req, res) => {
-    const filtro = typeof req.query.q === "string" ? req.query.q : undefined;
-    res.json(await empresasService.listar(req.user!, filtro));
+    const filtros = empresasService.listadoSchema.parse(req.query);
+    res.json(await empresasService.listar(filtros, req.user!));
   })
 );
 

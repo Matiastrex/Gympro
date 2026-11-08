@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { Prisma } from "@prisma/client";
+import { idQuery, paginacionOpcionalSchema, paginado } from "../../utils/paginacion";
 import { ApiError } from "../../utils/apiError";
 import { prisma } from "../../config/db";
 import * as oportunidadesRepo from "./oportunidades.repository";
@@ -28,9 +29,39 @@ export type OportunidadInput = z.infer<typeof oportunidadSchema>;
 const MOTIVO_OBLIGATORIO = "Elegí el motivo por el que se perdió la oportunidad";
 const etapaDesactivada = (nombre: string) => ApiError.badRequest(`La etapa «${nombre}» está desactivada`);
 
-// Para un vendedor, alcance() pisa cualquier responsableId pedido: solo ve lo suyo.
-export function listar(filtros: { etapaId?: number; responsableId?: number }, actor: Actor) {
-  return oportunidadesRepo.findAll({ ...filtros, ...alcance(actor) });
+export const listadoSchema = paginacionOpcionalSchema.extend({
+  q: z.string().trim().optional(),
+  estado: z.enum(["ABIERTA", "GANADA", "PERDIDA", "BAJA"]).optional(),
+  etapaId: idQuery,
+  responsableId: idQuery,
+  origenId: idQuery,
+});
+
+export type FiltrosOportunidades = z.infer<typeof listadoSchema>;
+
+// La visibilidad del rol va en su propio AND: para un vendedor, pedir el
+// responsableId de otro da un listado vacío, nunca lo ajeno.
+export async function listar(filtros: FiltrosOportunidades, actor: Actor) {
+  const { page, pageSize, q, estado, etapaId, responsableId, origenId } = filtros;
+  const where: Prisma.OportunidadWhereInput = {
+    AND: [
+      alcance(actor),
+      { estado, etapaId, responsableId, origenId },
+      q
+        ? {
+            OR: [
+              { titulo: { contains: q } },
+              { contacto: { nombre: { contains: q } } },
+              { contacto: { apellido: { contains: q } } },
+              { empresa: { razonSocial: { contains: q } } },
+            ],
+          }
+        : {},
+    ],
+  };
+  if (!page) return oportunidadesRepo.findAll(where);
+  const { items, total } = await oportunidadesRepo.findPaginado(where, { page, pageSize });
+  return paginado(items, total, { page, pageSize });
 }
 
 // Sin actor no se controla el acceso: es para llamadas internas (p. ej. la

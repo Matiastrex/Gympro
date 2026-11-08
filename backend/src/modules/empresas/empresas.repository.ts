@@ -1,23 +1,24 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "../../config/db";
+import { Paginacion, skipTake } from "../../utils/paginacion";
 
-export function findAll({ filtro, visibilidad }: { filtro?: string; visibilidad: Prisma.EmpresaWhereInput }) {
-  return prisma.empresa.findMany({
-    where: {
-      AND: visibilidad,
-      OR: filtro
-        ? [
-            { razonSocial: { contains: filtro } },
-            { email: { contains: filtro } },
-          ]
-        : undefined,
-    },
-    include: {
-      responsable: { select: { id: true, nombre: true, apellido: true } },
-      origen: { select: { id: true, nombre: true } },
-    },
-    orderBy: { razonSocial: "asc" },
-  });
+const includeListado = {
+  responsable: { select: { id: true, nombre: true, apellido: true } },
+  origen: { select: { id: true, nombre: true } },
+} satisfies Prisma.EmpresaInclude;
+
+const ordenListado = [{ razonSocial: "asc" }, { id: "asc" }] satisfies Prisma.EmpresaOrderByWithRelationInput[];
+
+export function findAll(where: Prisma.EmpresaWhereInput) {
+  return prisma.empresa.findMany({ where, include: includeListado, orderBy: ordenListado });
+}
+
+export async function findPaginado(where: Prisma.EmpresaWhereInput, paginacion: Paginacion) {
+  const [items, total] = await prisma.$transaction([
+    prisma.empresa.findMany({ where, include: includeListado, orderBy: ordenListado, ...skipTake(paginacion) }),
+    prisma.empresa.count({ where }),
+  ]);
+  return { items, total };
 }
 
 export function findById(id: number) {

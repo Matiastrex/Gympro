@@ -1,13 +1,18 @@
 import { FormEvent, useEffect, useState } from "react";
 import { api } from "../api/client";
 import { Modal } from "../components/Modal";
-import { Badge } from "../components/Badge";
+import { Badge, ESTADO_LABEL } from "../components/Badge";
+import { Paginacion } from "../components/Paginacion";
+import { useListadoPaginado } from "../hooks/useListadoPaginado";
+import { useEquipo } from "../hooks/useEquipo";
+import { useAuth } from "../context/AuthContext";
+import { veTodo } from "../constants/roles";
 import { Avatar } from "../components/Avatar";
 import { PencilIcon, SearchIcon } from "../components/icons";
 import { HistorialComercial } from "../components/HistorialComercial";
 import { Reapertura, ReaperturaPendiente } from "../components/Reapertura";
 import { ResponsableSelect } from "../components/ResponsableSelect";
-import { CatalogoSelect } from "../components/CatalogoSelect";
+import { CatalogoSelect, useCatalogo } from "../components/CatalogoSelect";
 import type { RefCatalogo } from "../types/configuracion";
 
 interface Opcion {
@@ -53,6 +58,10 @@ function conVinculoActual(opciones: Opcion[], id: number | null | undefined, act
   return [{ id, ...actual }, ...opciones];
 }
 
+const ESTADOS_OPORTUNIDAD = ["ABIERTA", "GANADA", "PERDIDA", "BAJA"];
+
+const filtrosVacios = { etapaId: "", estado: "", responsableId: "", origenId: "" };
+
 const formVacio = {
   titulo: "",
   contactoId: "",
@@ -68,27 +77,30 @@ const formVacio = {
 };
 
 export function OportunidadesPage() {
-  const [oportunidades, setOportunidades] = useState<Oportunidad[]>([]);
+  const { usuario } = useAuth();
+  const verEquipo = veTodo(usuario?.rol);
+  const listado = useListadoPaginado<Oportunidad, typeof filtrosVacios>("/oportunidades", filtrosVacios);
+  const { filtros, cambiar } = listado;
+  const equipo = useEquipo(verEquipo);
+  const origenes = useCatalogo("origenes");
   const [contactos, setContactos] = useState<Opcion[]>([]);
   const [empresas, setEmpresas] = useState<Opcion[]>([]);
   const [productos, setProductos] = useState<Opcion[]>([]);
   const [etapas, setEtapas] = useState<Opcion[]>([]);
-  const [search, setSearch] = useState("");
   const [form, setForm] = useState(formVacio);
   const [error, setError] = useState<string | null>(null);
   const [mostrarForm, setMostrarForm] = useState(false);
   const [editando, setEditando] = useState<Oportunidad | null>(null);
   const [detalle, setDetalle] = useState<OportunidadDetalle | null>(null);
 
-  async function cargar() {
-    const [ops, cs, es, ps, et] = await Promise.all([
-      api.get("/oportunidades"),
+  // Opciones de los selects (listas completas, sin paginar).
+  async function cargarOpciones() {
+    const [cs, es, ps, et] = await Promise.all([
       api.get("/contactos"),
       api.get("/empresas"),
       api.get("/productos"),
       api.get("/etapas"),
     ]);
-    setOportunidades(ops.data);
     setContactos(cs.data);
     setEmpresas(es.data);
     setProductos(ps.data);
@@ -96,15 +108,8 @@ export function OportunidadesPage() {
   }
 
   useEffect(() => {
-    cargar();
+    cargarOpciones();
   }, []);
-
-  const oportunidadesFiltradas = oportunidades.filter((o) => {
-    const texto = search.trim().toLowerCase();
-    if (!texto) return true;
-    const nombreRelacion = o.contacto ? `${o.contacto.nombre} ${o.contacto.apellido}` : o.empresa?.razonSocial ?? "";
-    return o.titulo.toLowerCase().includes(texto) || nombreRelacion.toLowerCase().includes(texto);
-  });
 
   function abrirCreacion() {
     setForm(formVacio);
@@ -137,7 +142,8 @@ export function OportunidadesPage() {
   }
 
   async function recargarTrasReapertura(id: number) {
-    await Promise.all([cargar(), abrirDetalle(id)]);
+    listado.recargar();
+    await abrirDetalle(id);
   }
 
   async function handleSubmit(e: FormEvent) {
@@ -169,7 +175,7 @@ export function OportunidadesPage() {
         await api.post("/oportunidades", payload);
         setMostrarForm(false);
       }
-      await cargar();
+      listado.recargar();
     } catch (err: any) {
       setError(err.response?.data?.error ?? "No se pudo guardar la oportunidad");
     }
@@ -196,7 +202,12 @@ export function OportunidadesPage() {
         <div className="toolbar">
           <div className="search-input">
             <SearchIcon />
-            <input placeholder="Buscar por título, contacto o empresa" value={search} onChange={(e) => setSearch(e.target.value)} />
+            <input
+              placeholder="Buscar por título, contacto o empresa"
+              value={listado.busqueda}
+              onChange={(e) => listado.setBusqueda(e.target.value)}
+              aria-label="Buscar oportunidades"
+            />
           </div>
           <button className="btn" onClick={abrirCreacion}>
             + Nueva oportunidad
@@ -204,7 +215,57 @@ export function OportunidadesPage() {
         </div>
       </div>
 
-      <div className="card table-card table-wide">
+      <div className="filters-bar">
+        <select className="filter-select" value={filtros.etapaId} onChange={(e) => cambiar("etapaId", e.target.value)} aria-label="Etapa">
+          <option value="">Todas las etapas</option>
+          {etapas.map((et) => (
+            <option key={et.id} value={et.id}>
+              {et.nombre}
+            </option>
+          ))}
+        </select>
+        <select className="filter-select" value={filtros.estado} onChange={(e) => cambiar("estado", e.target.value)} aria-label="Estado">
+          <option value="">Todos los estados</option>
+          {ESTADOS_OPORTUNIDAD.map((es) => (
+            <option key={es} value={es}>
+              {ESTADO_LABEL[es]}
+            </option>
+          ))}
+        </select>
+        {verEquipo && (
+          <select
+            className="filter-select"
+            value={filtros.responsableId}
+            onChange={(e) => cambiar("responsableId", e.target.value)}
+            aria-label="Responsable"
+          >
+            <option value="">Todos los responsables</option>
+            {equipo.map((u) => (
+              <option key={u.id} value={u.id}>
+                {u.nombre} {u.apellido}
+              </option>
+            ))}
+          </select>
+        )}
+        <select className="filter-select" value={filtros.origenId} onChange={(e) => cambiar("origenId", e.target.value)} aria-label="Origen">
+          <option value="">Todos los orígenes</option>
+          {origenes.map((o) => (
+            <option key={o.id} value={o.id}>
+              {o.nombre}
+            </option>
+          ))}
+        </select>
+        {listado.hayFiltros && (
+          <button type="button" className="link-btn" onClick={listado.limpiar}>
+            Limpiar filtros
+          </button>
+        )}
+      </div>
+
+      {listado.error && <div className="error-box">{listado.error}</div>}
+
+      <div className="card">
+        <div className="table-card table-wide">
         <table>
           <thead>
             <tr>
@@ -219,7 +280,7 @@ export function OportunidadesPage() {
             </tr>
           </thead>
           <tbody>
-            {oportunidadesFiltradas.map((o) => (
+            {listado.items.map((o) => (
               <tr key={o.id} onClick={() => abrirDetalle(o.id)}>
                 <td className="cell-primary">{o.titulo}</td>
                 <td className="cell-muted">{o.contacto ? `${o.contacto.nombre} ${o.contacto.apellido}` : o.empresa?.razonSocial ?? "—"}</td>
@@ -248,15 +309,17 @@ export function OportunidadesPage() {
                 </td>
               </tr>
             ))}
-            {oportunidadesFiltradas.length === 0 && (
+            {listado.cargado && listado.items.length === 0 && (
               <tr className="row-empty">
                 <td colSpan={8} className="empty-state">
-                  Todavía no hay oportunidades cargadas
+                  {listado.hayFiltros ? "Ninguna oportunidad coincide con estos filtros." : "Todavía no hay oportunidades cargadas"}
                 </td>
               </tr>
             )}
           </tbody>
         </table>
+        </div>
+        <Paginacion total={listado.total} page={listado.page} pageSize={listado.pageSize} onPage={listado.setPage} />
       </div>
 
       {formActivo && (

@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { Prisma } from "@prisma/client";
+import { idQuery, paginacionOpcionalSchema, paginado } from "../../utils/paginacion";
 import { ApiError } from "../../utils/apiError";
 import * as contactosRepo from "./contactos.repository";
 import * as oportunidadesService from "../oportunidades/oportunidades.service";
@@ -26,8 +28,38 @@ export const bajaSchema = z.object({
   motivoBaja: z.string().optional(),
 });
 
-export function listar(actor: Actor, filtro?: string) {
-  return contactosRepo.findAll({ filtro, visibilidad: alcanceConCreador(actor) });
+export const listadoSchema = paginacionOpcionalSchema.extend({
+  q: z.string().trim().optional(),
+  estado: z.enum(["POTENCIAL", "CLIENTE", "INACTIVO", "NO_CONTACTAR"]).optional(),
+  responsableId: idQuery,
+  origenId: idQuery,
+  empresaId: idQuery,
+});
+
+export type FiltrosContactos = z.infer<typeof listadoSchema>;
+
+// La visibilidad del rol va en su propio AND: un filtro no puede ampliarla.
+export async function listar(filtros: FiltrosContactos, actor: Actor) {
+  const { page, pageSize, q, estado, responsableId, origenId, empresaId } = filtros;
+  const where: Prisma.ContactoWhereInput = {
+    AND: [
+      alcanceConCreador(actor),
+      { estado, responsableId, origenId, empresaId },
+      q
+        ? {
+            OR: [
+              { nombre: { contains: q } },
+              { apellido: { contains: q } },
+              { email: { contains: q } },
+              { documento: { contains: q } },
+            ],
+          }
+        : {},
+    ],
+  };
+  if (!page) return contactosRepo.findAll(where);
+  const { items, total } = await contactosRepo.findPaginado(where, { page, pageSize });
+  return paginado(items, total, { page, pageSize });
 }
 
 export async function obtener(id: number, actor: Actor, modo: Modo = "editar") {
