@@ -54,6 +54,13 @@ export function update(id: number, data: Prisma.EmpresaUncheckedUpdateInput) {
       });
     }
 
+    if (empresa.oportunidadAbiertaId != null && responsableId !== undefined) {
+      await tx.oportunidad.update({
+        where: { id: empresa.oportunidadAbiertaId },
+        data: { responsableId },
+      });
+    }
+
     return empresa;
   });
 }

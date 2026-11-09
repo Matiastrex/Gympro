@@ -84,26 +84,7 @@ export async function actualizar(id: number, data: ContactoInput, actor: Actor) 
   }
   const responsableId = await resolverResponsable(actor, data.responsableId, contacto.responsableId);
   if (contacto.oportunidadAbiertaId != null) {
-    const oportunidad = await oportunidadesService.obtener(contacto.oportunidadAbiertaId, actor);
-    await oportunidadesService.actualizar(
-      oportunidad.id,
-      {
-        titulo: oportunidad.titulo,
-        empresaId: oportunidad.empresaId,
-        contactoId: oportunidad.contactoId,
-        responsableId,
-        productoId: oportunidad.productoId,
-        etapaId: oportunidad.etapaId,
-        valorEstimado: oportunidad.valorEstimado?.toNumber() ?? null,
-        probabilidadCierre: oportunidad.probabilidadCierre,
-        fechaEstimadaCierre: oportunidad.fechaEstimadaCierre?.toISOString() ?? null,
-        origenId: oportunidad.origenId,
-        motivoPerdidaId: oportunidad.motivoPerdidaId,
-        motivoPerdidaDetalle: oportunidad.motivoPerdidaDetalle,
-        observaciones: oportunidad.observaciones,
-      },
-      actor
-    );
+    await oportunidadesService.obtener(contacto.oportunidadAbiertaId, actor);
   }
   return contactosRepo.update(id, { ...data, responsableId } as any);
 }
