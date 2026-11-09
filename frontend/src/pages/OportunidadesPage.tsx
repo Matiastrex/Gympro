@@ -22,6 +22,7 @@ interface Opcion {
   razonSocial?: string;
   tipo?: string;
   responsableId?: number | null;
+  empresaId?: number | null;
 }
 
 interface Oportunidad {
@@ -183,7 +184,8 @@ export function OportunidadesPage() {
   }
 
   const formActivo = mostrarForm || editando !== null;
-  const opcionesContacto = conVinculoActual(contactos, editando?.contactoId, editando?.contacto);
+  const contactosSinConvenio = contactos.filter((contacto) => contacto.empresaId == null);
+  const opcionesContacto = conVinculoActual(contactosSinConvenio, editando?.contactoId, editando?.contacto);
   const opcionesEmpresa = conVinculoActual(empresas, editando?.empresaId, editando?.empresa);
   const etapaSeleccionada = etapas.find((et) => et.id === Number(form.etapaId));
   const mostrarMotivoPerdida = editando !== null && etapaSeleccionada?.tipo == "PERDIDA";
