@@ -94,7 +94,7 @@ export async function actualizar(id: number, data: ContactoInput, actor: Actor) 
         responsableId,
         productoId: oportunidad.productoId,
         etapaId: oportunidad.etapaId,
-        valorEstimado: oportunidad.valorEstimado,
+        valorEstimado: oportunidad.valorEstimado?.toNumber() ?? null,
         probabilidadCierre: oportunidad.probabilidadCierre,
         fechaEstimadaCierre: oportunidad.fechaEstimadaCierre?.toISOString() ?? null,
         origenId: oportunidad.origenId,

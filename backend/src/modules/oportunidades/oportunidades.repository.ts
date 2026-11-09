@@ -78,6 +78,12 @@ export function create(
       });
     }
 
+    await reasignarEntidades(tx, {
+      responsableId: oportunidad.responsableId,
+      empresaId: empresaId ?? null,
+      contactoId: contactoId ?? null,
+    });
+
     await tx.historialEtapa.create({
       data: {
         oportunidadId: oportunidad.id,
