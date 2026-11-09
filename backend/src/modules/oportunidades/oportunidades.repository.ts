@@ -62,27 +62,29 @@ export function create(
     if (empresaId != null) {
       await tx.empresa.update({
         where: { id: empresaId },
-        data: { oportunidadAbiertaId: oportunidad.id, estado: estadoEntidad },
+        data: {
+          oportunidadAbiertaId: oportunidad.id,
+          estado: estadoEntidad,
+          responsableId: oportunidad.responsableId,
+        },
       });
 
       await tx.contacto.updateMany({
         where: { empresaId },
-        data: { estado: estadoEntidad },
+        data: { estado: estadoEntidad, responsableId: oportunidad.responsableId },
       });
     }
 
     if (contactoId != null) {
       await tx.contacto.update({
         where: { id: contactoId },
-        data: { oportunidadAbiertaId: oportunidad.id, estado: estadoEntidad },
+        data: {
+          oportunidadAbiertaId: oportunidad.id,
+          estado: estadoEntidad,
+          responsableId: oportunidad.responsableId,
+        },
       });
     }
-
-    await reasignarEntidades(tx, {
-      responsableId: oportunidad.responsableId,
-      empresaId: empresaId ?? null,
-      contactoId: contactoId ?? null,
-    });
 
     await tx.historialEtapa.create({
       data: {
@@ -138,7 +140,10 @@ type Reasignacion = { responsableId: number | null; empresaId: number | null; co
 // quien atiende la consulta es quien atiende al socio. Quien los creó los
 // sigue viendo en modo lectura (ver creadoPorId).
 async function reasignarEntidades(tx: Prisma.TransactionClient, { responsableId, empresaId, contactoId }: Reasignacion) {
-  if (empresaId != null) await tx.empresa.update({ where: { id: empresaId }, data: { responsableId } });
+  if (empresaId != null) {
+    await tx.empresa.update({ where: { id: empresaId }, data: { responsableId } });
+    await tx.contacto.updateMany({ where: { empresaId }, data: { responsableId } });
+  }
   if (contactoId != null) await tx.contacto.update({ where: { id: contactoId }, data: { responsableId } });
 }
 

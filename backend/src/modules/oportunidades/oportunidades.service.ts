@@ -175,7 +175,7 @@ export async function actualizar(id: number, input: OportunidadInput, actor: Act
     responsableId: await resolverResponsable(actor, input.responsableId, oportunidad.responsableId),
   };
   const usuarioId = actor.userId;
-  const reasignarEntidadesA = data.responsableId !== oportunidad.responsableId ? data.responsableId : undefined;
+  const reasignarEntidadesA = data.responsableId;
 
   const etapa = await oportunidadesRepo.findEtapaTipo(data.etapaId);
   if (!etapa) throw ApiError.notFound("Etapa no encontrada");
