@@ -19,6 +19,8 @@ interface Empresa {
   id: number;
   razonSocial: string;
   estado: string;
+  responsableId?: number | null;
+  responsable?: { id: number; nombre: string; apellido: string } | null;
 }
 
 interface Contacto {
@@ -146,7 +148,11 @@ export function ContactosPage() {
     const payload = {
       ...form,
       empresaId: form.empresaId ? Number(form.empresaId) : null,
-      responsableId: form.responsableId ? Number(form.responsableId) : null,
+      responsableId: responsablePorEmpresa
+        ? Number(responsablePorEmpresa)
+        : form.responsableId
+          ? Number(form.responsableId)
+          : null,
       origenId: form.origenId ? Number(form.origenId) : null,
       estado: estadoPorEmpresa ?? form.estado,
     };
@@ -170,6 +176,11 @@ export function ContactosPage() {
     ? empresaSeleccionada.estado === "NO_CONTACTAR"
       ? "INACTIVO"
       : empresaSeleccionada.estado
+    : null;
+  const responsablePorEmpresa = empresaSeleccionada
+    ? empresaSeleccionada.responsableId
+      ? String(empresaSeleccionada.responsableId)
+      : ""
     : null;
   const estadoBloqueadoPorOportunidad = !empresaSeleccionada && editando?.oportunidadAbiertaId != null;
   const estadoBloqueado = Boolean(empresaSeleccionada) || estadoBloqueadoPorOportunidad;
@@ -383,10 +394,25 @@ export function ContactosPage() {
                   ))}
                 </select>
               </label>
-              <ResponsableSelect
-                value={form.responsableId}
-                onChange={(responsableId) => setForm((f) => ({ ...f, responsableId }))}
-              />
+              {empresaSeleccionada ? (
+                <label>
+                  Responsable (por empresa)
+                  <select disabled value={responsablePorEmpresa ?? ""}>
+                    {empresaSeleccionada.responsable ? (
+                      <option value={empresaSeleccionada.responsable.id}>
+                        {empresaSeleccionada.responsable.nombre} {empresaSeleccionada.responsable.apellido}
+                      </option>
+                    ) : (
+                      <option value="">Sin asignar</option>
+                    )}
+                  </select>
+                </label>
+              ) : (
+                <ResponsableSelect
+                  value={form.responsableId}
+                  onChange={(responsableId) => setForm((f) => ({ ...f, responsableId }))}
+                />
+              )}
               <label>
                 Origen
                 <CatalogoSelect
