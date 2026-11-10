@@ -24,6 +24,13 @@ const includeHistorialEtapa = {
 
 export type HistorialEtapaConRelaciones = Prisma.HistorialEtapaGetPayload<{ include: typeof includeHistorialEtapa }>;
 
+const includeEdicion = {
+  usuario: usuarioResumen,
+  oportunidad: { select: { id: true, titulo: true } },
+} satisfies Prisma.EdicionOportunidadInclude;
+
+export type EdicionConRelaciones = Prisma.EdicionOportunidadGetPayload<{ include: typeof includeEdicion }>;
+
 const ordenCronologico = [{ fecha: "desc" }, { id: "desc" }] satisfies Prisma.ActividadOrderByWithRelationInput[];
 
 export async function findPaginado(where: Prisma.ActividadWhereInput, paginacion: Paginacion) {
@@ -40,6 +47,11 @@ export function findMany(where: Prisma.ActividadWhereInput) {
 
 export function findHistorialEtapas(where: Prisma.HistorialEtapaWhereInput) {
   return prisma.historialEtapa.findMany({ where, include: includeHistorialEtapa, orderBy: ordenCronologico });
+}
+
+// Correcciones de oportunidades cerradas (ver oportunidadesService.actualizarCerrada).
+export function findEdiciones(where: Prisma.EdicionOportunidadWhereInput) {
+  return prisma.edicionOportunidad.findMany({ where, include: includeEdicion, orderBy: ordenCronologico });
 }
 
 export function create(data: Prisma.ActividadUncheckedCreateInput) {

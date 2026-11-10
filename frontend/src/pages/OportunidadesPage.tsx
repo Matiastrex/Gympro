@@ -76,11 +76,15 @@ const formVacio = {
   motivoPerdidaId: "",
   motivoPerdidaDetalle: "",
   observaciones: "",
+  motivoEdicion: "",
 };
+
+const CERRADA_SOLO_ADMIN = "Está cerrada: solo un administrador puede corregirla";
 
 export function OportunidadesPage() {
   const { usuario } = useAuth();
   const verEquipo = veTodo(usuario?.rol);
+  const esAdmin = usuario?.rol === "ADMINISTRADOR";
   const listado = useListadoPaginado<Oportunidad, typeof filtrosVacios>("/oportunidades", filtrosVacios);
   const { filtros, cambiar } = listado;
   const equipo = useEquipo(verEquipo);
@@ -133,6 +137,7 @@ export function OportunidadesPage() {
       motivoPerdidaId: o.motivoPerdidaId ? String(o.motivoPerdidaId) : "",
       motivoPerdidaDetalle: o.motivoPerdidaDetalle ?? "",
       observaciones: o.observaciones ?? "",
+      motivoEdicion: "",
     });
     setError(null);
     setEditando(o);
@@ -168,6 +173,7 @@ export function OportunidadesPage() {
         ? { motivoPerdidaId: Number(form.motivoPerdidaId), motivoPerdidaDetalle: form.motivoPerdidaDetalle || null }
         : { motivoPerdidaId: null, motivoPerdidaDetalle: null }),
       observaciones: form.observaciones || null,
+      ...(editandoCerrada ? { motivoEdicion: form.motivoEdicion.trim() } : {}),
     };
     try {
       if (editando) {
@@ -184,6 +190,9 @@ export function OportunidadesPage() {
   }
 
   const formActivo = mostrarForm || editando !== null;
+  // Corregir una oportunidad cerrada: solo el admin, sin cambiar la etapa, y con
+  // un motivo que queda en el historial junto con cada campo modificado.
+  const editandoCerrada = editando !== null && editando.estado !== "ABIERTA";
   const contactosSinConvenio = contactos.filter((contacto) => contacto.empresaId == null);
   const opcionesContacto = conVinculoActual(contactosSinConvenio, editando?.contactoId, editando?.contacto);
   const opcionesEmpresa = conVinculoActual(empresas, editando?.empresaId, editando?.empresa);
@@ -305,7 +314,13 @@ export function OportunidadesPage() {
                 <td className="cell-muted">{o.valorEstimado ? `$${o.valorEstimado}` : "—"}</td>
                 <td>
                   <div className="row-actions">
-                    <button className="icon-btn" onClick={(e) => abrirEdicion(o, e)} aria-label="Editar">
+                    <button
+                      className="icon-btn"
+                      onClick={(e) => abrirEdicion(o, e)}
+                      aria-label="Editar"
+                      disabled={o.estado !== "ABIERTA" && !esAdmin}
+                      title={o.estado !== "ABIERTA" && !esAdmin ? CERRADA_SOLO_ADMIN : undefined}
+                    >
                       <PencilIcon />
                     </button>
                   </div>
@@ -329,6 +344,14 @@ export function OportunidadesPage() {
         <Modal title={editando ? "Editar oportunidad" : "Nueva oportunidad"} onClose={() => (editando ? setEditando(null) : setMostrarForm(false))}>
           <form onSubmit={handleSubmit}>
             {error && <div className="error-box">{error}</div>}
+            {editandoCerrada && (
+              <div className="reapertura-callout is-form">
+                <p>
+                  Esta oportunidad está cerrada ({ESTADO_LABEL[editando.estado] ?? editando.estado}). Podés corregir sus
+                  datos, pero no su etapa, y cada cambio queda registrado en el historial con tu nombre y el motivo.
+                </p>
+              </div>
+            )}
             <div className="form-grid">
               <label className="span-2">
                 Título *
@@ -338,6 +361,8 @@ export function OportunidadesPage() {
                 Etapa *
                 <select
                   required
+                  disabled={editandoCerrada}
+                  title={editandoCerrada ? "La etapa de una oportunidad cerrada no se cambia desde acá" : undefined}
                   value={form.etapaId}
                   onChange={(e) => {
                     const etapaId = e.target.value;
@@ -463,6 +488,17 @@ export function OportunidadesPage() {
                 Observaciones
                 <textarea value={form.observaciones} onChange={(e) => setForm({ ...form, observaciones: e.target.value })} />
               </label>
+              {editandoCerrada && (
+                <label className="span-2">
+                  Motivo de la corrección *
+                  <textarea
+                    required
+                    placeholder="Por qué se corrige una oportunidad ya cerrada (queda en el historial)"
+                    value={form.motivoEdicion}
+                    onChange={(e) => setForm({ ...form, motivoEdicion: e.target.value })}
+                  />
+                </label>
+              )}
             </div>
             <div className="modal-actions">
               <button type="button" className="btn secondary" onClick={() => (editando ? setEditando(null) : setMostrarForm(false))}>

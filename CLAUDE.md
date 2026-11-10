@@ -124,7 +124,7 @@ only `POST /api/actividades` and reads, no PUT/DELETE. Rules in `actividades.ser
   filters `tipoActividadId`, `usuarioId`, `desde`, `hasta`, `q`. A VENDEDOR sees what they registered plus
   activity on records they're responsable for (`alcanceActividades` in `permisos.ts`).
 - `GET /api/actividades/historial?contactoId=|empresaId=|oportunidadId=` (exactly one, `RefEntidad`)
-  returns the merged timeline: `{ kind: "actividad" | "etapa", fecha, ... }` sorted newest first. An
+  returns the merged timeline: `{ kind: "actividad" | "etapa" | "edicion", fecha, ... }` sorted newest first. An
   empresa's historial includes its contactos' activity. Frontend: `components/HistorialComercial.tsx`
   (used in the contacto, empresa, oportunidad and embudo detail modals) and `ActividadForm.tsx`; shared
   types in `src/types/actividades.ts`.
@@ -232,6 +232,13 @@ Key domain rules enforced in the service layer (see `oportunidades.service.ts`):
   touching `fechaRealCierre`), leaves the contacto/empresa `INACTIVO` by default, and marks their
   `bajaDefinitiva`, which blocks them from ever booking a clase de prueba again (`esClasePrueba`
   etapas).
+- Editing the *data* of a closed oportunidad (`PUT /api/oportunidades/:id` when `estado` isn't `ABIERTA`)
+  goes through `actualizarCerrada` in the service: only an ADMINISTRADOR can do it (403 otherwise), with a
+  mandatory `motivoEdicion`, and never together with an etapa change or a new contacto/empresa. Each
+  correction writes an `EdicionOportunidad` row (`cambios`: `[{ campo, antes, despues }]` with readable
+  values) in the same transaction as the update, and shows up in the historial as `kind: "edicion"`.
+  An etapa-only PUT still goes to `cambiarEtapa`. In the UI, Editar is disabled for non-admins on closed
+  rows, and the admin's form locks the etapa and asks for the motivo.
 - The internal identifiers for that etapa still say "baja" (enum `BAJA`, `fechaBaja`, `motivoBaja`,
   `bajaDefinitiva`, CSS `is-baja`); only its name and the UI copy say "Inscripción cancelada". Don't
   confuse it with the baja lógica of a contacto/empresa below.

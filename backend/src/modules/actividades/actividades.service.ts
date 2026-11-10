@@ -5,7 +5,7 @@ import { Actor, alcanceActividades, verificarAccesoRelacion } from "../../utils/
 import { Paginado, paginacionSchema, paginado } from "../../utils/paginacion";
 import { ExactlyOne } from "../../utils/tipos";
 import * as actividadesRepo from "./actividades.repository";
-import type { ActividadConRelaciones, HistorialEtapaConRelaciones } from "./actividades.repository";
+import type { ActividadConRelaciones, EdicionConRelaciones, HistorialEtapaConRelaciones } from "./actividades.repository";
 import * as contactosService from "../contactos/contactos.service";
 import * as empresasService from "../empresas/empresas.service";
 import * as oportunidadesService from "../oportunidades/oportunidades.service";
@@ -55,12 +55,15 @@ export const refEntidadSchema = z
   })
   .transform((ref) => ref as RefEntidad);
 
-/** Un ítem de la línea de tiempo: una actividad registrada o un cambio de etapa. */
+/** Un ítem de la línea de tiempo: una actividad, un cambio de etapa o la corrección de una oportunidad cerrada. */
 export type HistorialItem =
   | { kind: "actividad"; fecha: Date; actividad: ActividadConRelaciones }
-  | { kind: "etapa"; fecha: Date; cambio: HistorialEtapaConRelaciones };
+  | { kind: "etapa"; fecha: Date; cambio: HistorialEtapaConRelaciones }
+  | { kind: "edicion"; fecha: Date; edicion: EdicionConRelaciones };
 
-type FiltrosHistorial = { actividades: Prisma.ActividadWhereInput; etapas: Prisma.HistorialEtapaWhereInput };
+// Etapas y ediciones cuelgan de la oportunidad, así que comparten el filtro.
+type FiltroDeOportunidad = Prisma.HistorialEtapaWhereInput & Prisma.EdicionOportunidadWhereInput;
+type FiltrosHistorial = { actividades: Prisma.ActividadWhereInput; etapas: FiltroDeOportunidad };
 
 // Verifica que el actor pueda VER la entidad y arma los filtros de su historial.
 async function filtrosHistorial(ref: RefEntidad, actor: Actor): Promise<FiltrosHistorial> {
@@ -88,13 +91,15 @@ async function filtrosHistorial(ref: RefEntidad, actor: Actor): Promise<FiltrosH
 
 export async function historial(ref: RefEntidad, actor: Actor): Promise<HistorialItem[]> {
   const filtros = await filtrosHistorial(ref, actor);
-  const [actividades, cambios] = await Promise.all([
+  const [actividades, cambios, ediciones] = await Promise.all([
     actividadesRepo.findMany(filtros.actividades),
     actividadesRepo.findHistorialEtapas(filtros.etapas),
+    actividadesRepo.findEdiciones(filtros.etapas),
   ]);
   const items: HistorialItem[] = [
     ...actividades.map((actividad) => ({ kind: "actividad" as const, fecha: actividad.fecha, actividad })),
     ...cambios.map((cambio) => ({ kind: "etapa" as const, fecha: cambio.fecha, cambio })),
+    ...ediciones.map((edicion) => ({ kind: "edicion" as const, fecha: edicion.fecha, edicion })),
   ];
   return items.sort((a, b) => b.fecha.getTime() - a.fecha.getTime());
 }

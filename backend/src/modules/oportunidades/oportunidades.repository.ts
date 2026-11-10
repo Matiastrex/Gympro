@@ -147,14 +147,55 @@ async function reasignarEntidades(tx: Prisma.TransactionClient, { responsableId,
   if (contactoId != null) await tx.contacto.update({ where: { id: contactoId }, data: { responsableId } });
 }
 
-export function update(id: number, data: Prisma.OportunidadUpdateInput, reasignarEntidadesA?: number | null) {
+export type CambioCampo = { campo: string; antes: string | null; despues: string | null };
+
+// Corrección de una oportunidad cerrada: se guarda en la misma transacción que
+// el update, así no puede quedar un cambio sin su registro (ni al revés).
+export type EdicionRegistrada = { usuarioId: number; motivo: string; cambios: CambioCampo[] };
+
+export function update(
+  id: number,
+  data: Prisma.OportunidadUpdateInput,
+  reasignarEntidadesA?: number | null,
+  edicion?: EdicionRegistrada
+) {
   return prisma.$transaction(async (tx) => {
     const oportunidad = await tx.oportunidad.update({ where: { id }, data, include: includeCompleto });
     if (reasignarEntidadesA !== undefined) {
       await reasignarEntidades(tx, { ...oportunidad, responsableId: reasignarEntidadesA });
     }
+    if (edicion) {
+      await tx.edicionOportunidad.create({
+        data: { oportunidadId: id, usuarioId: edicion.usuarioId, motivo: edicion.motivo, cambios: edicion.cambios },
+      });
+    }
     return oportunidad;
   });
+}
+
+// Nombres legibles de los ids que cambiaron, para el registro de la corrección.
+export async function nombresRelaciones(ids: {
+  responsableId?: number | null;
+  productoId?: number | null;
+  origenId?: number | null;
+  motivoPerdidaId?: number | null;
+}) {
+  const [responsable, producto, origen, motivoPerdida] = await Promise.all([
+    ids.responsableId != null
+      ? prisma.usuario.findUnique({ where: { id: ids.responsableId }, select: { nombre: true, apellido: true } })
+      : null,
+    ids.productoId != null ? prisma.producto.findUnique({ where: { id: ids.productoId }, select: { nombre: true } }) : null,
+    ids.origenId != null ? prisma.origen.findUnique({ where: { id: ids.origenId }, select: { nombre: true } }) : null,
+    ids.motivoPerdidaId != null
+      ? prisma.motivoPerdida.findUnique({ where: { id: ids.motivoPerdidaId }, select: { nombre: true } })
+      : null,
+  ]);
+  return {
+    responsable: responsable ? `${responsable.nombre} ${responsable.apellido}` : null,
+    producto: producto?.nombre ?? null,
+    origen: origen?.nombre ?? null,
+    motivoPerdida: motivoPerdida?.nombre ?? null,
+  };
 }
 
 // Agrupa las oportunidades por etapa para el tablero del embudo comercial.

@@ -588,6 +588,13 @@ textarea { resize: vertical; min-height: 70px; font-family: inherit; }
 /* Lo que registró el embudo: marcador hueco y más callado. */
 .is-etapa .timeline-marker { border: 1px dashed var(--ink-faint); color: var(--ink-faint); background: var(--surface); }
 
+/* Corrección de una oportunidad cerrada: hecha por una persona, pero es una excepción. */
+.is-edicion .timeline-marker { background: var(--warning-wash); color: var(--warning); }
+.timeline-cambios { list-style: none; margin: 6px 0 0; padding: 0; font-size: 13px; color: var(--ink); display: grid; gap: 3px; }
+.timeline-cambio-campo { color: var(--ink-soft); }
+.timeline-cambios del { color: var(--ink-faint); }
+.timeline-cambios ins { text-decoration: none; font-weight: 600; }
+
 .timeline-content { flex: 1; min-width: 0; padding: 4px 0 20px; }
 .timeline-heading { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
 .timeline-heading strong { font-size: 13.5px; }
@@ -661,6 +668,7 @@ td.cell-fecha { white-space: nowrap; color: var(--ink-soft); font-variant-numeri
   color: var(--ink);
 }
 .reapertura-callout p { margin: 0; line-height: 1.45; }
+.reapertura-callout.is-form { margin: 0 0 16px; }
 .reapertura-callout .btn { flex: 0 0 auto; }
 
 /* ---------- Notificaciones ---------- */

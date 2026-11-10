@@ -73,6 +73,7 @@ model Usuario {
   oportunidades         Oportunidad[]    @relation("ResponsableOportunidad")
   actividades           Actividad[]
   cambiosDeEtapa        HistorialEtapa[]
+  edicionesOportunidad  EdicionOportunidad[]
   reaperturasPedidas    SolicitudReapertura[] @relation("SolicitanteReapertura")
   reaperturasResueltas  SolicitudReapertura[] @relation("ResolutorReapertura")
   notificaciones        Notificacion[]
@@ -224,6 +225,7 @@ model Oportunidad {
 
   actividades           Actividad[]
   historialEtapas       HistorialEtapa[]
+  ediciones             EdicionOportunidad[]
   solicitudesReapertura SolicitudReapertura[]
   notificaciones        Notificacion[]
 
@@ -231,6 +233,27 @@ model Oportunidad {
   updatedAt DateTime @updatedAt
 
   @@map("oportunidades")
+}
+
+// Corrección de una oportunidad ya cerrada (Inscripto, Perdida o Inscripción
+// cancelada). Solo un administrador puede hacerla, con un motivo obligatorio,
+// y cada una queda registrada acá: quién, cuándo, por qué y qué campos cambió.
+model EdicionOportunidad {
+  id Int @id @default(autoincrement())
+
+  oportunidadId Int
+  oportunidad   Oportunidad @relation(fields: [oportunidadId], references: [id])
+
+  usuarioId Int
+  usuario   Usuario @relation(fields: [usuarioId], references: [id])
+
+  fecha  DateTime @default(now())
+  motivo String   @db.Text
+  // [{ campo, antes, despues }] con valores ya legibles (nombres, no ids).
+  cambios Json
+
+  @@index([oportunidadId])
+  @@map("ediciones_oportunidad")
 }
 
 // ---------- Catálogos configurables por el administrador ----------

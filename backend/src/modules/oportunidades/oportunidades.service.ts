@@ -26,6 +26,13 @@ export const oportunidadSchema = z.object({
 
 export type OportunidadInput = z.infer<typeof oportunidadSchema>;
 
+// El PUT acepta además el motivo, obligatorio solo al corregir una oportunidad cerrada.
+export const actualizacionSchema = oportunidadSchema.extend({
+  motivoEdicion: z.string().trim().max(1000).optional().nullable(),
+});
+
+export type ActualizacionInput = z.infer<typeof actualizacionSchema>;
+
 const MOTIVO_OBLIGATORIO = "Elegí el motivo por el que se perdió la oportunidad";
 const etapaDesactivada = (nombre: string) => ApiError.badRequest(`La etapa «${nombre}» está desactivada`);
 
@@ -166,8 +173,9 @@ export async function historial(oportunidadId: number, actor: Actor) {
   return oportunidadesRepo.findHistorial(oportunidadId);
 }
 
-export async function actualizar(id: number, input: OportunidadInput, actor: Actor) {
+export async function actualizar(id: number, { motivoEdicion, ...input }: ActualizacionInput, actor: Actor) {
   const oportunidad = await obtener(id, actor);
+  if (oportunidad.estado !== "ABIERTA") return actualizarCerrada(oportunidad, input, motivoEdicion, actor);
   validarRelacionComercial(input);
   await verificarAccesoRelaciones(actor, input, oportunidad);
   const data = {
@@ -204,6 +212,142 @@ export async function actualizar(id: number, input: OportunidadInput, actor: Act
   }
 
   return oportunidadesRepo.update(id, { ...camposActualizacion, ...motivo } as any, reasignarEntidadesA);
+}
+
+type OportunidadActual = Awaited<ReturnType<typeof obtener>>;
+
+const CERRADA_SOLO_ADMIN = "Solo un administrador puede modificar una oportunidad cerrada";
+
+// Una oportunidad cerrada (Inscripto, Perdida o Inscripción cancelada) no se
+// modifica sin autorización, y si se modifica el cambio queda registrado:
+// - Cambiar solo la etapa sigue pasando por cambiarEtapa (Inscripto ->
+//   Inscripción cancelada; lo demás lo rechaza, y una Perdida vuelve por la reapertura).
+// - Corregir datos es solo para el administrador, con un motivo obligatorio, y
+//   escribe una EdicionOportunidad con cada campo antes/después en la misma transacción.
+async function actualizarCerrada(
+  oportunidad: OportunidadActual,
+  input: OportunidadInput,
+  motivoEdicion: string | null | undefined,
+  actor: Actor
+) {
+  if (input.empresaId !== undefined && (input.empresaId ?? null) !== oportunidad.empresaId) {
+    throw ApiError.badRequest("No se puede cambiar la empresa de una oportunidad cerrada");
+  }
+  if (input.contactoId !== undefined && (input.contactoId ?? null) !== oportunidad.contactoId) {
+    throw ApiError.badRequest("No se puede cambiar el contacto de una oportunidad cerrada");
+  }
+
+  // El motivo de pérdida solo tiene sentido (y solo se corrige) en una Perdida.
+  const esPerdida = oportunidad.estado === "PERDIDA";
+  const campos: Prisma.OportunidadUncheckedUpdateInput = {};
+  const definidos = <T>(v: T | undefined, actual: T) => (v === undefined ? actual : v);
+  const nuevo = {
+    titulo: definidos(input.titulo, oportunidad.titulo),
+    responsableId: definidos(input.responsableId, oportunidad.responsableId),
+    productoId: definidos(input.productoId, oportunidad.productoId),
+    valorEstimado: definidos(input.valorEstimado, numeroONull(oportunidad.valorEstimado)),
+    probabilidadCierre: definidos(input.probabilidadCierre, oportunidad.probabilidadCierre),
+    fechaEstimadaCierre: input.fechaEstimadaCierre === undefined
+      ? oportunidad.fechaEstimadaCierre
+      : input.fechaEstimadaCierre ? new Date(input.fechaEstimadaCierre) : null,
+    origenId: definidos(input.origenId, oportunidad.origenId),
+    motivoPerdidaId: esPerdida ? definidos(input.motivoPerdidaId, oportunidad.motivoPerdidaId) : oportunidad.motivoPerdidaId,
+    motivoPerdidaDetalle: esPerdida
+      ? textoONull(definidos(input.motivoPerdidaDetalle, oportunidad.motivoPerdidaDetalle))
+      : oportunidad.motivoPerdidaDetalle,
+    observaciones: textoONull(definidos(input.observaciones, oportunidad.observaciones)),
+  };
+
+  const nombresNuevos = await oportunidadesRepo.nombresRelaciones(nuevo);
+  const cambios: oportunidadesRepo.CambioCampo[] = [];
+  const comparar = <K extends keyof typeof nuevo>(
+    campo: K,
+    etiqueta: string,
+    antes: string | null,
+    despues: string | null,
+    iguales: boolean
+  ) => {
+    if (iguales) return;
+    campos[campo] = nuevo[campo] as never;
+    cambios.push({ campo: etiqueta, antes, despues });
+  };
+
+  comparar("titulo", "Título", oportunidad.titulo, nuevo.titulo, nuevo.titulo === oportunidad.titulo);
+  comparar(
+    "responsableId",
+    "Responsable",
+    oportunidad.responsable ? `${oportunidad.responsable.nombre} ${oportunidad.responsable.apellido}` : null,
+    nombresNuevos.responsable,
+    nuevo.responsableId === oportunidad.responsableId
+  );
+  comparar("productoId", "Plan / servicio", oportunidad.producto?.nombre ?? null, nombresNuevos.producto,
+    nuevo.productoId === oportunidad.productoId);
+  comparar("valorEstimado", "Valor estimado", formatoPesos(numeroONull(oportunidad.valorEstimado)),
+    formatoPesos(nuevo.valorEstimado), nuevo.valorEstimado === numeroONull(oportunidad.valorEstimado));
+  comparar("probabilidadCierre", "Probabilidad de cierre", formatoPorcentaje(oportunidad.probabilidadCierre),
+    formatoPorcentaje(nuevo.probabilidadCierre), nuevo.probabilidadCierre === oportunidad.probabilidadCierre);
+  comparar("fechaEstimadaCierre", "Fecha estimada de cierre", formatoFecha(oportunidad.fechaEstimadaCierre),
+    formatoFecha(nuevo.fechaEstimadaCierre),
+    nuevo.fechaEstimadaCierre?.getTime() === oportunidad.fechaEstimadaCierre?.getTime());
+  comparar("origenId", "Origen", oportunidad.origen?.nombre ?? null, nombresNuevos.origen,
+    nuevo.origenId === oportunidad.origenId);
+  comparar("motivoPerdidaId", "Motivo de pérdida", oportunidad.motivoPerdida?.nombre ?? null, nombresNuevos.motivoPerdida,
+    nuevo.motivoPerdidaId === oportunidad.motivoPerdidaId);
+  const detalleAntes = textoONull(oportunidad.motivoPerdidaDetalle);
+  comparar("motivoPerdidaDetalle", "Detalle del motivo de pérdida", detalleAntes, nuevo.motivoPerdidaDetalle,
+    nuevo.motivoPerdidaDetalle === detalleAntes);
+  const observacionesAntes = textoONull(oportunidad.observaciones);
+  comparar("observaciones", "Observaciones", observacionesAntes, nuevo.observaciones,
+    nuevo.observaciones === observacionesAntes);
+
+  if (input.etapaId !== oportunidad.etapaId) {
+    if (cambios.length > 0) {
+      throw ApiError.badRequest("En una oportunidad cerrada, cambiá la etapa sin modificar otros datos en la misma edición");
+    }
+    return cambiarEtapa({ oportunidadId: oportunidad.id, etapaNuevaId: input.etapaId, usuarioId: actor.userId, actor });
+  }
+
+  if (cambios.length === 0) return oportunidad;
+  if (actor.rol !== "ADMINISTRADOR") throw ApiError.forbidden(CERRADA_SOLO_ADMIN);
+  if (!motivoEdicion) throw ApiError.badRequest("Indicá el motivo de la corrección: queda registrado en el historial");
+
+  if (campos.responsableId !== undefined) {
+    await resolverResponsable(actor, nuevo.responsableId, oportunidad.responsableId);
+  }
+  if (campos.origenId !== undefined) {
+    await catalogosService.validarSeleccion("origenes", nuevo.origenId, oportunidad.origenId);
+  }
+  if (campos.motivoPerdidaId !== undefined) {
+    if (!nuevo.motivoPerdidaId) throw ApiError.badRequest(MOTIVO_OBLIGATORIO);
+    await catalogosService.validarSeleccion("motivos-perdida", nuevo.motivoPerdidaId, oportunidad.motivoPerdidaId);
+  }
+
+  return oportunidadesRepo.update(
+    oportunidad.id,
+    campos as Prisma.OportunidadUpdateInput,
+    campos.responsableId !== undefined ? nuevo.responsableId : undefined,
+    { usuarioId: actor.userId, motivo: motivoEdicion, cambios }
+  );
+}
+
+function numeroONull(valor: Prisma.Decimal | number | null): number | null {
+  return valor == null ? null : Number(valor);
+}
+
+function textoONull(valor: string | null | undefined): string | null {
+  return valor?.trim() ? valor : null;
+}
+
+function formatoPesos(valor: number | null) {
+  return valor == null ? null : `$${valor.toLocaleString("es-AR")}`;
+}
+
+function formatoPorcentaje(valor: number | null) {
+  return valor == null ? null : `${valor}%`;
+}
+
+function formatoFecha(valor: Date | null) {
+  return valor ? valor.toLocaleDateString("es-AR", { timeZone: "UTC" }) : null;
 }
 
 export function tableroEmbudo(actor: Actor) {

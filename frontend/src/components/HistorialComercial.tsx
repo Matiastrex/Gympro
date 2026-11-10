@@ -3,10 +3,11 @@ import { api } from "../api/client";
 import { ActividadForm } from "./ActividadForm";
 import { TipoActividadIcon } from "./TipoActividadIcon";
 import { Badge } from "./Badge";
-import { FunnelIcon } from "./icons";
+import { FunnelIcon, PencilIcon } from "./icons";
 import {
   Actividad,
   CambioEtapa,
+  EdicionOportunidad,
   HistorialItem,
   KindHistorial,
   RefEntidad,
@@ -30,6 +31,7 @@ const FILTROS: readonly { valor: Filtro; label: string }[] = [
   { valor: "todo", label: "Todo" },
   { valor: "actividad", label: "Actividades" },
   { valor: "etapa", label: "Etapas" },
+  { valor: "edicion", label: "Correcciones" },
 ];
 
 const ETAPA_CIERRE = new Set(["GANADA", "PERDIDA", "BAJA"]);
@@ -70,7 +72,8 @@ export function HistorialComercial({ entidad, nombreEntidad, motivoSoloLectura }
 
       {items && items.length > 0 && (
         <div className="segmented" role="group" aria-label="Qué mostrar">
-          {FILTROS.map((f) => (
+          {/* "Correcciones" solo aparece si hubo alguna: es la excepción, no la regla. */}
+          {FILTROS.filter((f) => f.valor !== "edicion" || cantidad("edicion") > 0).map((f) => (
             <button
               key={f.valor}
               type="button"
@@ -122,6 +125,8 @@ function claveDe(item: HistorialItem): number {
       return item.actividad.id;
     case "etapa":
       return item.cambio.id;
+    case "edicion":
+      return item.edicion.id;
     default:
       return assertNever(item);
   }
@@ -137,6 +142,8 @@ function ItemHistorial({ item, viendo }: { item: HistorialItem; viendo: Viendo }
       return <ItemActividad actividad={item.actividad} viendo={viendo} />;
     case "etapa":
       return <ItemEtapa cambio={item.cambio} mostrarOportunidad={viendo !== "oportunidad"} />;
+    case "edicion":
+      return <ItemEdicion edicion={item.edicion} mostrarOportunidad={viendo !== "oportunidad"} />;
     default:
       return assertNever(item);
   }
@@ -199,6 +206,37 @@ function ItemEtapa({ cambio, mostrarOportunidad }: { cambio: CambioEtapa; mostra
         <span className="timeline-meta">
           {nombreUsuario(cambio.usuario)}
           {mostrarOportunidad && <> en «{cambio.oportunidad.titulo}»</>}
+        </span>
+      </div>
+    </li>
+  );
+}
+
+function ItemEdicion({ edicion, mostrarOportunidad }: { edicion: EdicionOportunidad; mostrarOportunidad: boolean }) {
+  return (
+    <li className="timeline-item is-edicion">
+      <span className="timeline-marker">
+        <PencilIcon width={13} height={13} aria-hidden="true" />
+      </span>
+      <div className="timeline-content">
+        <div className="timeline-heading">
+          <strong>Corrección de oportunidad cerrada</strong>
+          <time dateTime={edicion.fecha}>{formatearFecha(edicion.fecha)}</time>
+        </div>
+        <ul className="timeline-cambios">
+          {edicion.cambios.map((c) => (
+            <li key={c.campo}>
+              <span className="timeline-cambio-campo">{c.campo}:</span> <del>{c.antes ?? "—"}</del>{" "}
+              <span aria-label="pasó a">→</span> <ins>{c.despues ?? "—"}</ins>
+            </li>
+          ))}
+        </ul>
+        <p className="timeline-resultado">
+          <span>Motivo</span> {edicion.motivo}
+        </p>
+        <span className="timeline-meta">
+          {nombreUsuario(edicion.usuario)}
+          {mostrarOportunidad && <> en «{edicion.oportunidad.titulo}»</>}
         </span>
       </div>
     </li>

@@ -53,9 +53,20 @@ export interface CambioEtapa {
   oportunidad: { id: number; titulo: string };
 }
 
+/** Corrección de una oportunidad cerrada, hecha por un administrador. */
+export interface EdicionOportunidad {
+  id: number;
+  fecha: string;
+  motivo: string;
+  cambios: { campo: string; antes: string | null; despues: string | null }[];
+  usuario: UsuarioResumen;
+  oportunidad: { id: number; titulo: string };
+}
+
 export type HistorialItem =
   | { kind: "actividad"; fecha: string; actividad: Actividad }
-  | { kind: "etapa"; fecha: string; cambio: CambioEtapa };
+  | { kind: "etapa"; fecha: string; cambio: CambioEtapa }
+  | { kind: "edicion"; fecha: string; edicion: EdicionOportunidad };
 
 export type KindHistorial = HistorialItem["kind"];
 
