@@ -21,6 +21,8 @@ interface Opcion {
   apellido?: string;
   razonSocial?: string;
   tipo?: string;
+  responsableId?: number | null;
+  empresaId?: number | null;
 }
 
 interface Oportunidad {
@@ -182,7 +184,8 @@ export function OportunidadesPage() {
   }
 
   const formActivo = mostrarForm || editando !== null;
-  const opcionesContacto = conVinculoActual(contactos, editando?.contactoId, editando?.contacto);
+  const contactosSinConvenio = contactos.filter((contacto) => contacto.empresaId == null);
+  const opcionesContacto = conVinculoActual(contactosSinConvenio, editando?.contactoId, editando?.contacto);
   const opcionesEmpresa = conVinculoActual(empresas, editando?.empresaId, editando?.empresa);
   const etapaSeleccionada = etapas.find((et) => et.id === Number(form.etapaId));
   const mostrarMotivoPerdida = editando !== null && etapaSeleccionada?.tipo == "PERDIDA";
@@ -385,7 +388,18 @@ export function OportunidadesPage() {
                 <select
                   disabled={editando ? true : false}
                   value={form.contactoId}
-                  onChange={(e) => setForm({ ...form, contactoId: e.target.value, empresaId: "" })}
+                  onChange={(e) => {
+                    const contactoId = e.target.value;
+                    const contacto = contactos.find((c) => c.id === Number(contactoId));
+                    setForm((actual) => ({
+                      ...actual,
+                      contactoId,
+                      empresaId: "",
+                      responsableId: actual.responsableId || !contacto?.responsableId
+                        ? actual.responsableId
+                        : String(contacto.responsableId),
+                    }));
+                  }}
                 >
                   <option value="">— ninguno —</option>
                   {opcionesContacto.map((c) => (
@@ -400,7 +414,18 @@ export function OportunidadesPage() {
                 <select
                   disabled={editando ? true : false}
                   value={form.empresaId}
-                  onChange={(e) => setForm({ ...form, empresaId: e.target.value, contactoId: "" })}
+                  onChange={(e) => {
+                    const empresaId = e.target.value;
+                    const empresa = empresas.find((emp) => emp.id === Number(empresaId));
+                    setForm((actual) => ({
+                      ...actual,
+                      empresaId,
+                      contactoId: "",
+                      responsableId: actual.responsableId || !empresa?.responsableId
+                        ? actual.responsableId
+                        : String(empresa.responsableId),
+                    }));
+                  }}
                 >
                   <option value="">— ninguna —</option>
                   {opcionesEmpresa.map((emp) => (

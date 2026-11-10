@@ -37,16 +37,27 @@ export function create(data: Prisma.EmpresaCreateInput) {
   return prisma.empresa.create({ data });
 }
 
-export function update(id: number, data: Prisma.EmpresaUpdateInput) {
+export function update(id: number, data: Prisma.EmpresaUncheckedUpdateInput) {
   return prisma.$transaction(async (tx) => {
     const empresa = await tx.empresa.update({ where: { id }, data });
     const estado = typeof data.estado === "string" ? data.estado : undefined;
+    const responsableId = data.responsableId;
 
-    if (estado) {
-      const nuevoEstadoDeContacto = estado === "NO_CONTACTAR" ? "INACTIVO" : estado
+    if (estado || responsableId !== undefined) {
+      const datosContacto: Prisma.ContactoUncheckedUpdateManyInput = {
+        ...(estado ? { estado: estado === "NO_CONTACTAR" ? "INACTIVO" : estado } : {}),
+        ...(responsableId !== undefined ? { responsableId } : {}),
+      };
       await tx.contacto.updateMany({
         where: { empresaId: id },
-        data: { estado: nuevoEstadoDeContacto },
+        data: datosContacto,
+      });
+    }
+
+    if (empresa.oportunidadAbiertaId != null && responsableId !== undefined) {
+      await tx.oportunidad.update({
+        where: { id: empresa.oportunidadAbiertaId },
+        data: { responsableId },
       });
     }
 

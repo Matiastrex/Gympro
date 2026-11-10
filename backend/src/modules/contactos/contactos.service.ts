@@ -83,6 +83,9 @@ export async function actualizar(id: number, data: ContactoInput, actor: Actor) 
     await verificarAccesoRelacion(actor, "empresa", data.empresaId);
   }
   const responsableId = await resolverResponsable(actor, data.responsableId, contacto.responsableId);
+  if (contacto.oportunidadAbiertaId != null) {
+    await oportunidadesService.obtener(contacto.oportunidadAbiertaId, actor);
+  }
   return contactosRepo.update(id, { ...data, responsableId } as any);
 }
 

@@ -38,8 +38,40 @@ export function create(data: Prisma.ContactoCreateInput) {
   return prisma.contacto.create({ data });
 }
 
-export function update(id: number, data: Prisma.ContactoUpdateInput) {
-  return prisma.contacto.update({ where: { id }, data });
+export function update(id: number, data: Prisma.ContactoUncheckedUpdateInput) {
+  return prisma.$transaction(async (tx) => {
+    const contacto = await tx.contacto.update({ where: { id }, data });
+    const responsableId =
+      typeof data.responsableId === "number" || data.responsableId === null ? data.responsableId : undefined;
+
+    if (contacto.oportunidadAbiertaId != null && responsableId !== undefined) {
+      const oportunidad = await tx.oportunidad.update({
+        where: { id: contacto.oportunidadAbiertaId },
+        data: { responsableId },
+        select: { empresaId: true, contactoId: true },
+      });
+
+      if (oportunidad.empresaId != null) {
+        await tx.empresa.update({
+          where: { id: oportunidad.empresaId },
+          data: { responsableId },
+        });
+        await tx.contacto.updateMany({
+          where: { empresaId: oportunidad.empresaId },
+          data: { responsableId },
+        });
+      }
+
+      if (oportunidad.contactoId != null && oportunidad.contactoId !== id) {
+        await tx.contacto.update({
+          where: { id: oportunidad.contactoId },
+          data: { responsableId },
+        });
+      }
+    }
+
+    return contacto;
+  });
 }
 
 export function darDeBaja(id: number, estado: "INACTIVO" | "NO_CONTACTAR") {
