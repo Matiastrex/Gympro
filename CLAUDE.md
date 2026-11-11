@@ -125,7 +125,10 @@ only `POST /api/actividades` and reads, no PUT/DELETE. Rules in `actividades.ser
   activity on records they're responsable for (`alcanceActividades` in `permisos.ts`).
 - `GET /api/actividades/historial?contactoId=|empresaId=|oportunidadId=` (exactly one, `RefEntidad`)
   returns the merged timeline: `{ kind: "actividad" | "etapa" | "edicion", fecha, ... }` sorted newest first. An
-  empresa's historial includes its contactos' activity. Frontend: `components/HistorialComercial.tsx`
+  empresa's historial includes its contactos' activity. An oportunidad's historial also includes the
+  actividades of its contacto/empresa that have no `oportunidadId` (e.g. logged before the oportunidad was
+  created), dated after the previous oportunidad of that entity closed (`findCierreAnterior`) and up to this
+  one's `fechaRealCierre`, so consecutive oportunidades don't share them. Nothing is written onto the actividades. Frontend: `components/HistorialComercial.tsx`
   (used in the contacto, empresa, oportunidad and embudo detail modals) and `ActividadForm.tsx`; shared
   types in `src/types/actividades.ts`.
 

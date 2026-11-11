@@ -85,8 +85,24 @@ async function filtrosHistorial(ref: RefEntidad, actor: Actor): Promise<FiltrosH
     };
   }
   const id = ref.oportunidadId;
-  await oportunidadesService.obtener(id, actor);
-  return { actividades: { oportunidadId: id }, etapas: { oportunidadId: id } };
+  const oportunidad = await oportunidadesService.obtener(id, actor);
+  // Lo registrado sobre el contacto/empresa antes de crear la oportunidad (sin oportunidadId)
+  // también forma parte de su historia: desde el cierre de la oportunidad anterior de esa
+  // entidad hasta el cierre de esta, para que las ventanas no se superpongan.
+  const entidad: Prisma.ActividadWhereInput[] = [];
+  if (oportunidad.contactoId != null) entidad.push({ contactoId: oportunidad.contactoId });
+  if (oportunidad.empresaId != null) entidad.push({ empresaId: oportunidad.empresaId });
+  if (entidad.length === 0) {
+    return { actividades: { oportunidadId: id }, etapas: { oportunidadId: id } };
+  }
+  const desde = (await actividadesRepo.findCierreAnterior(oportunidad))?.fechaRealCierre ?? undefined;
+  const hasta = oportunidad.fechaRealCierre ?? undefined;
+  return {
+    actividades: {
+      OR: [{ oportunidadId: id }, { oportunidadId: null, OR: entidad, fecha: { gt: desde, lte: hasta } }],
+    },
+    etapas: { oportunidadId: id },
+  };
 }
 
 export async function historial(ref: RefEntidad, actor: Actor): Promise<HistorialItem[]> {

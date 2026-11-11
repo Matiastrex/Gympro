@@ -69,3 +69,19 @@ export function findContactoEmpresa(contactoId: number) {
 export async function existeEmpresa(id: number) {
   return (await prisma.empresa.count({ where: { id } })) > 0;
 }
+
+type OportunidadRef = { id: number; contactoId: number | null; empresaId: number | null; createdAt: Date };
+
+// Cierre de la oportunidad anterior del mismo contacto/empresa: marca desde cuándo las
+// actividades sin oportunidad de esa entidad corresponden a `op` (ver historial).
+export function findCierreAnterior(op: OportunidadRef) {
+  const entidad: Prisma.OportunidadWhereInput[] = [];
+  if (op.contactoId != null) entidad.push({ contactoId: op.contactoId });
+  if (op.empresaId != null) entidad.push({ empresaId: op.empresaId });
+  if (entidad.length === 0) return Promise.resolve(null);
+  return prisma.oportunidad.findFirst({
+    where: { id: { not: op.id }, OR: entidad, fechaRealCierre: { lte: op.createdAt } },
+    orderBy: { fechaRealCierre: "desc" },
+    select: { fechaRealCierre: true },
+  });
+}
